@@ -1,0 +1,129 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-Black.ttf",
+      "sha1": "5dd37822cc824d6cde4592aee9bf6e4ec89c39de"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-Bold.ttf",
+      "sha1": "4ef04c324db80777a2c2ab86b39d51dc0dab7380"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-BoldItalic.ttf",
+      "sha1": "dd114fd0165cc2ef6309a148f1085584c4502e91"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-Book.ttf",
+      "sha1": "de68fe519a3560400964a6ee51d062f1addc9003"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-BookItalic.ttf",
+      "sha1": "06d0870dcfa1461a037c82352290f848697177bd"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-Heavy.ttf",
+      "sha1": "795332729601b6c3c6ec794c294332a2de2a0b9f"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-HeavyItalic.ttf",
+      "sha1": "635a362fb75d7c986682dc4b2ea2862d87114e4a"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-Light.ttf",
+      "sha1": "283d8a0533758474d32cec5909e481aedafe1c43"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-LightItalic.ttf",
+      "sha1": "487835aafeec2af506e6d6a0cd1696d353e29290"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-Medium.ttf",
+      "sha1": "d4309ae2309de2b47386acd6bcdc61ff578dd905"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-Regular.ttf",
+      "sha1": "22cbcb96210dcace86a3d798dd9b72eba0e545f5"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-RegularItalic.ttf",
+      "sha1": "5e670fe4f30041cd5e19fef1d3e7ded01d24be16"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-Thin.ttf",
+      "sha1": "6ea38646e7fb88335781632c30b5126dc45bf7f6"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonPro-ThinItalic.ttf",
+      "sha1": "dc9302d3ef3850e2396dd1ae4e928829ffc78483"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProBlack.ttf",
+      "sha1": "9f0f9736fdce3444168ab21d81287da48edd3aee"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProBlackItalic.otf",
+      "sha1": "a1a62bc773fbc77fbb7e6c72ea56869c91b48ebd"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProBold.otf",
+      "sha1": "faeecd2168ce1e0f2ce4587dc53a8dcf822e0aeb"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProBoldItalic.otf",
+      "sha1": "2b3faa68fd07383daf7bd1d29598ab30d86d1547"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProBook.otf",
+      "sha1": "12c5b8db4568415016d8e5321bc92646c4dff3c5"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProBookItalic.otf",
+      "sha1": "36e3ad190f670a63eed185481069ce77996de908"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProHeavy.otf",
+      "sha1": "1e900dc2c8337446e5076ed544b643e3fb6d45e3"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProHeavyItalic.otf",
+      "sha1": "52f9fcab78fba2ba58e7e8c17a378a307397249d"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProLight.otf",
+      "sha1": "7967d85e68607e09c0ba02f88a93db2f80f18cb8"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProLightItalic.otf",
+      "sha1": "4da97be0faf62105dd7dae98a982e0a22cda09ad"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProMedium.otf",
+      "sha1": "d71e213519c911b66f24310267499d3f3b20ff64"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProMediumItalic.otf",
+      "sha1": "5dac3259822fe73427d37edd78c6ce00872e011e"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProRegular.otf",
+      "sha1": "a42e1cbffef3bf54c3aaaf219f592167ac9f082d"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProRegularItalic.otf",
+      "sha1": "77311e4a9a419ba814f2b8e77c844bcc014a9300"
+    },
+    {
+      "path": "App/src/Assets/fonts/FilsonProThinItalic.otf",
+      "sha1": "ac2ff670ea8b016a6b2b1217c272f5c298e58403"
+    },
+    {
+      "path": "App/src/Assets/fonts/PlaywriteNL-VariableFont_wght.ttf",
+      "sha1": "162e6264af18bd579223a3970202f79999e7524c"
+    },
+    {
+      "path": "App/src/Assets/fonts/Poppins-Black.ttf",
+      "sha1": "645e04c53c6b5b35bce654a811ebce16af8aa721"
+    }
+  ]
+}
