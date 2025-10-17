@@ -1,5 +1,6 @@
 export const Config = {
-  API_URL: 'https://us-east-18gh6qa2z0.auth.us-east-1.amazoncognito.com',
+  // API_URL: 'https://us-east-18gh6qa2z0.auth.us-east-1.amazoncognito.com',
+  API_URL: 'https://3hc254p0l3.execute-api.us-east-1.amazonaws.com/prod/auth',
   COGNITO_REGION: 'us-east-1',
   COGNITO_CLIENT_ID: '4vq7alk8e8uu9ajt3hh4tassk2',
   COGNITO_IDP_URL: 'https://cognito-idp.us-east-1.amazonaws.com/',

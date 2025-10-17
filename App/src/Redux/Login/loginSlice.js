@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { HelperService } from '../../commonFunction/HelperService';
-import { login, registerUser, confirmSignUp, logout } from './services';
+import { login, registerUser, confirmSignUp, logout, forgotPassword, confirmForgotPassword  } from './services';
 
 const initialState = {
   loading: false,
@@ -17,6 +17,13 @@ const initialState = {
   otpLoading: false,
   isOtpVerified: false,
   tempUserEmail: '',
+  // ✅ Forgot Password states
+  forgotPasswordLoading: false,
+  resetCodeSent: false,
+  
+  // ✅ Reset Password states
+  resetPasswordLoading: false,
+  passwordResetSuccess: false,
 };
 
 const loginSlice = createSlice({
@@ -41,6 +48,12 @@ const loginSlice = createSlice({
       state.isOtpVerified = false;
       state.otpLoading = false;
     },
+     clearForgotPasswordData: (state) => {
+      state.forgotPasswordLoading = false;
+      state.resetCodeSent = false;
+      state.resetPasswordLoading = false;
+      state.passwordResetSuccess = false;
+    },
   },
   extraReducers: (builder) => {
     // Login flow
@@ -50,6 +63,7 @@ const loginSlice = createSlice({
 
     builder.addCase(login.fulfilled, (state, { payload }) => {
   console.log('💡 login.fulfilled payload:', payload);
+   state.loading = false;
 
   if (payload && typeof payload === 'object') {
     state.userData = {
@@ -127,6 +141,38 @@ const loginSlice = createSlice({
       state.isOtpVerified = false;
     });
 
+     // ✅ Forgot Password flow
+    builder.addCase(forgotPassword.pending, (state) => {
+      state.forgotPasswordLoading = true;
+      state.resetCodeSent = false;
+    });
+
+    builder.addCase(forgotPassword.fulfilled, (state) => {
+      state.forgotPasswordLoading = false;
+      state.resetCodeSent = true;
+    });
+
+    builder.addCase(forgotPassword.rejected, (state) => {
+      state.forgotPasswordLoading = false;
+      state.resetCodeSent = false;
+    });
+
+    // ✅ Confirm Forgot Password (Reset Password) flow
+    builder.addCase(confirmForgotPassword.pending, (state) => {
+      state.resetPasswordLoading = true;
+      state.passwordResetSuccess = false;
+    });
+
+    builder.addCase(confirmForgotPassword.fulfilled, (state) => {
+      state.resetPasswordLoading = false;
+      state.passwordResetSuccess = true;
+    });
+
+    builder.addCase(confirmForgotPassword.rejected, (state) => {
+      state.resetPasswordLoading = false;
+      state.passwordResetSuccess = false;
+    });
+
     // Logout flow
     builder.addCase(logout.pending, (state) => {
       state.loading = true;
@@ -149,6 +195,7 @@ export const {
   setTempUserEmail,
   clearRegistrationData,
   clearOtpData,
+  clearForgotPasswordData,
 } = loginSlice.actions;
 
 export const loginDataSelectors = {
@@ -168,5 +215,15 @@ export const loginDataSelectors = {
     isLogged: state.loginData.is_logged,
     token: state.loginData.token,
     userData: state.loginData.userData,
+  }),
+   // ✅ Added missing selector
+  getForgotPasswordData: (state) => ({
+    loading: state.loginData.forgotPasswordLoading,
+    resetCodeSent: state.loginData.resetCodeSent,
+  }),
+  // ✅ Added reset password selector
+  getResetPasswordData: (state) => ({
+    loading: state.loginData.resetPasswordLoading,
+    success: state.loginData.passwordResetSuccess,
   }),
 };

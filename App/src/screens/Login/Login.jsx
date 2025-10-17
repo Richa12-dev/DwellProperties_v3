@@ -41,6 +41,19 @@ const Login = ({ navigation }) => {
     navigation.navigate('TenantLogin');
   };
 
+  const handleTenantLogin = () => {
+    navigation.navigate('TenantLogin', { userType: 'tenant' });
+  };
+
+  const handleLandlordLogin = () => {
+    navigation.navigate('LandlordLogin');
+  };
+
+  const handleContractorLogin = () => {
+    navigation.navigate('TenantLogin', { userType: 'contractor' });
+  };
+
+
   const handleRegister = () => {
     navigation.navigate('Register');
   };
@@ -48,25 +61,35 @@ const Login = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor={'#000'} barStyle="light-content" />
-      
+
       {/* Background Image with gradient overlay */}
       <ImageBackground
         source={require('../../Assets/Image/dwellProperties/Maskgroup1.png')}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
-        {/* Dark gradient overlay */}
         <LinearGradient
-          colors={['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0.7)']}
-          locations={[0, 0.5, 1]}
+          colors={[
+            'rgba(0, 0, 0, 0)',
+            'rgba(0, 0, 0, 0)',
+            'rgba(0, 0, 0, 0.2)',
+            'rgba(0, 0, 0, 0.6)',
+            'rgba(0, 0, 0, 0.9)',
+            '#000000',
+          ]}
+          locations={[0, 0.4, 0.55, 0.75, 0.9, 1]}
           style={styles.gradientOverlay}
         />
 
+
+
+
+
         <Animated.View style={[styles.contentContainer, { opacity: fadeAnim }]}>
-         
+
           <View style={styles.logoContainer}>
             <Image
-              source={require('../../Assets/Image/dwellProperties/Dlogo1.png')}
+              source={require('../../Assets/Image/D.png')}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -94,7 +117,7 @@ const Login = ({ navigation }) => {
             {/* Landlord Login Button */}
             <TouchableOpacity
               style={[styles.button, styles.redButton]}
-              onPress={handleLogin}
+              onPress={handleLandlordLogin}
               activeOpacity={0.8}
             >
               <Text style={styles.whiteButtonText}>Landlord Login</Text>
@@ -103,7 +126,7 @@ const Login = ({ navigation }) => {
             {/* Contractor Login Button */}
             <TouchableOpacity
               style={[styles.button, styles.outlineButton]}
-              onPress={handleLogin}
+              onPress={handleContractorLogin}
               activeOpacity={0.8}
             >
               <Text style={styles.outlineButtonText}>Contractor Login</Text>
@@ -144,8 +167,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   logo: {
-    width: wp(45),
+    width: wp(40),
     height: hp(30),
+  },
+  bottomContainer: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    paddingHorizontal: wp(5),
+    paddingBottom: hp(5),
+    paddingTop: hp(3),
+    alignItems: 'center',
   },
   formContainer: {
     position: 'absolute',
