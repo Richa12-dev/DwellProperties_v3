@@ -1,5 +1,4 @@
 import NetInfo from '@react-native-community/netinfo';
-// import NetInfo from '@react-native-netinfo/netinfo';
 
 import { NativeBaseProvider } from 'native-base';
 import React, { useEffect, useState } from 'react';
@@ -28,7 +27,7 @@ import ForgotPassword from './App/src/screens/Login/ForgotPassword';
 import ResetPassword from './App/src/screens/Login/ResetPassword';
 import BottomFotter from './App/src/navigation/BottonFooter';
 import ProfileFooter from './App/src/navigation/ProfileFooter';
-import AddPropertyScreen from './App/src/screens/Properties/AddPropertiesScreen';
+import AddPropertiesScreen from './App/src/screens/Properties/AddPropertiesScreen';
 import PropertiesDetails from './App/src/screens/Properties/PropertiesDetails';
 import LandlordProperties from './App/src/screens/Properties/LandlordProperties';
 import Properties from './App/src/screens/Properties/Properties';
@@ -41,6 +40,13 @@ import LandlordTicketDetails from './App/src/screens/Support/LandlordTicketDetai
 import Dashboard from './App/src/screens/Dashboard/Dashboard';
 import OtpScreen from './App/src/screens/Login/OtpScreen';
 import LandlordLogin from './App/src/screens/Login/LandlordLogin';
+import TenantPayments from './App/src/screens/Payment/TenantPayments';
+import ContactLandlord from './App/src/screens/Payment/ContactLandlord';
+import RentDocuments from './App/src/screens/Payment/RentDocuments';
+import RentHistory from './App/src/screens/Payment/RentHistory';
+import MaintenanceDetails from './App/src/screens/Support/MaintenanceDetails';
+import TenantNotification from './App/src/screens/Notification/TenantNotification';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -98,7 +104,7 @@ const App = () => {
               
               {/* Other Screens */}
               <Stack.Screen name="Dashboard" component={Dashboard} />
-              <Stack.Screen name="AddPropertiesScreen" component={AddPropertyScreen} />
+              <Stack.Screen name="AddPropertiesScreen" component={AddPropertiesScreen} />
               <Stack.Screen name="PropertiesDetails" component={PropertiesDetails} />
               <Stack.Screen name="LandlordProperties" component={LandlordProperties} />
               <Stack.Screen name="Properties" component={Properties} />
@@ -110,6 +116,17 @@ const App = () => {
               <Stack.Screen name="LandlordTicketDetails" component={LandlordTicketDetails} />
               <Stack.Screen name="OtpScreen" component={OtpScreen} />
               <Stack.Screen name="LandlordLogin" component={LandlordLogin} />
+              <Stack.Screen name="TenantPayments" component ={TenantPayments} />
+              <Stack.Screen name="ContactLandlord"
+              component ={ContactLandlord} />
+            <Stack.Screen name="RentDocuments"
+              component ={RentDocuments} />
+            <Stack.Screen name="RentHistory"
+              component ={RentHistory} />
+                <Stack.Screen name="MaintenanceDetails" component={MaintenanceDetails} />
+                
+                <Stack.Screen name = "TenantNotification" component= {TenantNotification} />
+
               
             </Stack.Navigator>
           </NavigationContainer>

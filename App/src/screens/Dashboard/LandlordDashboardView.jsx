@@ -1,484 +1,432 @@
-import React, {useState} from 'react';
+import React, { useState } from "react";
 import {
-  Platform,
-  ScrollView,
-  StyleSheet,
+  View,
   Text,
   TouchableOpacity,
-  View,
+  StyleSheet,
   Dimensions,
-  StatusBar as RNStatusBar
-} from 'react-native';
-import {Dropdown} from 'react-native-element-dropdown';
-
-import {icons} from '../../Assets';
-import {HelperService} from '../../commonFunction/HelperService';
-import {AppIcon} from '../../components/AppIcon';
-import Navbar from '../../components/CommonNavBar/index';
+  ScrollView,
+  Modal,
+  TouchableWithoutFeedback,
+} from "react-native";
+import { LineChart } from "react-native-chart-kit";
 import {
-  heightPercentageToDP,
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
-} from 'react-native-responsive-screen';
-import {Colors} from '../../Theme';
-import {getFontFamily} from '../../utils';
-// import Navbar from '../../components/CommonNavBar/index';
-import CollectionNavBar from '../../components/CollectionNavBar/CollectionNavBar';
-// import Navbar from '../../components/CommonNavBar/index';
+} from "react-native-responsive-screen";
+import { Colors } from "../../Theme";
+import { getFontFamily } from "../../utils";
+import { AppIcon } from "../../components/AppIcon";
+import { icons } from "../../Assets";
+import Container from "../../components/Container/Container";
 
-const LandlordDashboardView = ({navigation}) => {
-  const [isChecked, setIsChecked] = useState(true);
-  const [selectedPropertyType, setSelectedPropertyType] = useState('Residential Apartment');
+const LandlordDashboardView = ({ navigation }) => {
+  const screenWidth = Dimensions.get("window").width;
 
-  // Property management options
-  const propertyTypes = {
-    'Residential Apartment': icons.apartment || icons.homeLoanhero,
-    'Commercial Space': icons.commercial || icons.businessLoan,
-    'Villa/House': icons.villa || icons.homeLoanhero,
-    'Office Space': icons.office || icons.businessLoan,
-    'Retail Shop': icons.retail || icons.businessLoan,
-    'Warehouse': icons.warehouse || icons.businessLoan,
+ // 🔹 Modal state
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState("7 Days");
+
+  // 🔹 Chart data for each range
+  const chartDataSets = {
+    "7 Days": [20, 40, 80, 60, 50, 45, 40],
+    "1 Month": [35, 45, 55, 65],
+    "3 Months": [50, 60, 70],
+    "1 Year": [60, 80, 100, 110],
   };
 
-  const handleProceed = () => {
-    console.log(selectedPropertyType, 'selectedPropertyType');
-    
-    if (isChecked) {
-      if (selectedPropertyType === 'Residential Apartment') {
-        navigation.navigate('ResidentialPropertyManagement');
-      } else if (selectedPropertyType === 'Commercial Space') {
-        navigation.navigate('CommercialPropertyManagement');
-      } else if (selectedPropertyType === 'Villa/House') {
-        navigation.navigate('VillaPropertyManagement');
-      } else if (selectedPropertyType === 'Office Space') {
-        navigation.navigate('OfficeSpaceManagement');
-      } else if (selectedPropertyType === 'Retail Shop') {
-        navigation.navigate('RetailPropertyManagement');
-      } else {
-        navigation.navigate('WarehousePropertyManagement');
-      }
+  // 🔹 Labels depending on selection
+  const getLabels = () => {
+    switch (selectedFilter) {
+      case "1 Month":
+        return ["W1", "W2", "W3", "W4"];
+      case "3 Months":
+        return ["Jan", "Feb", "Mar"];
+      case "1 Year":
+        return ["Q1", "Q2", "Q3", "Q4"];
+      default:
+        return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     }
   };
 
-  const [dropdownData] = useState([
-    {value: '1', label: 'Residential Apartment'},
-    {value: '2', label: 'Commercial Space'},
-    {value: '3', label: 'Villa/House'},
-    {value: '4', label: 'Office Space'},
-    {value: '5', label: 'Retail Shop'},
-    {value: '6', label: 'Warehouse'},
-  ]);
-
-  const handleDropdownChange = selectedType => {
-    console.log(selectedType);
-    setSelectedPropertyType(selectedType);
-    setIsChecked(false);
+  const chartData = {
+    labels: getLabels(),
+    datasets: [
+      {
+        data: chartDataSets[selectedFilter],
+        strokeWidth: 2,
+        color: () => "rgba(229, 57, 53, 1)",
+         withShadow: false,
+          withDots: true,
+      },
+    ],
   };
 
-  const { width, height } = Dimensions.get('window');
- 
-  const wpLocal = (percentage) => {
-    return (width * percentage) / 100;
-  };
-   
-  const hpLocal = (percentage) => {
-    return (height * percentage) / 100;
+// ✅ Chart Config — completely transparent background for glass effect
+const chartConfig = {
+ backgroundColor: "transparent",
+  backgroundGradientFrom: "transparent",
+  backgroundGradientFromOpacity: 0,
+  backgroundGradientTo: "transparent",
+  backgroundGradientToOpacity: 0,
+
+  fillShadowGradientFrom: "transparent",
+  fillShadowGradientFromOpacity: 0,
+  fillShadowGradientTo: "transparent",
+  fillShadowGradientToOpacity: 0,
+  
+  color: () => "rgba(229, 57, 53, 1)",
+  labelColor: () => "rgba(102, 102, 102, 0.8)",
+  propsForDots: {
+    r: "4",
+    strokeWidth: "2",
+    stroke: "#E53935",
+  },
+  propsForBackgroundLines: {
+    strokeWidth: 0,
+  },
+};
+
+  // 🔹 Handle filter change
+  const handleFilterSelect = (option) => {
+    setSelectedFilter(option);
+    setFilterModalVisible(false);
   };
 
-  // Quick action buttons for landlord dashboard
-  const quickActions = [
+  const quickLinks = [
     {
-      title: 'Add New Property',
-      icon: icons.plus || icons.tick,
-      action: () => navigation.navigate('AddProperty'),
-      color: '#4CAF50'
+      title: "Add New Property",
+      icon: icons.newProperites,
+      action: () => navigation.navigate("AddProperty"),
     },
     {
-      title: 'Tenant Management',
-      icon: icons.users || icons.tick,
-      action: () => navigation.navigate('TenantManagement'),
-      color: '#2196F3'
+      title: "Tenant Management",
+      icon: icons.TenantManagement,
+      action: () => navigation.navigate("TenantManagement"),
     },
     {
-      title: 'Rent Collection',
-      icon: icons.money || icons.tick,
-      action: () => navigation.navigate('RentCollection'),
-      color: '#FF9800'
+      title: "Rent Collection",
+      icon: icons.rentCollection,
+      action: () => navigation.navigate("RentCollection"),
     },
     {
-      title: 'Maintenance Requests',
-      icon: icons.maintenance || icons.tick,
-      action: () => navigation.navigate('MaintenanceRequests'),
-      color: '#9C27B0'
+      title: "Maintenance Request",
+      icon: icons.mantenanceRequest,
+      action: () => navigation.navigate("MaintenanceRequests"),
     },
   ];
 
   return (
-    <>
-     <RNStatusBar 
-                backgroundColor={Colors.black || Colors.red || "#FF0000"} 
-                barStyle="light-content" 
-                translucent={false}
-              />
-     <CollectionNavBar />
-       {/* <Navbar /> */}
-   
-  
+    <Container>
+      <ScrollView contentContainerStyle={styles.container}>
+    
+        {/* Rent Summary Card */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryTop}>
+            <View style={styles.summaryItem}>
+              <AppIcon name={icons.totalProperties} size={wp(6)} />
+              <View style={{ marginLeft: wp(2) }}>
+                <Text style={styles.summaryNumber}>12</Text>
+                <Text style={styles.summaryLabel}>Total Properties</Text>
+              </View>
+            </View>
 
-        <ScrollView contentContainerStyle={styles.scrollViewContainer}>
-          <View style={styles.content}>
-            <Text style={styles.title}>Landlord Dashboard</Text>
-            <Text style={styles.welcomeText}>Welcome back! Manage your properties efficiently.</Text>
-            
-            {/* Quick Actions Grid */}
-            <View style={styles.quickActionsContainer}>
-              <Text style={styles.sectionTitle}>Quick Actions</Text>
-              <View style={styles.actionsGrid}>
-                {quickActions.map((action, index) => (
+            <View style={styles.summaryItem}>
+              <AppIcon name={icons.rentCollections} size={wp(6)} />
+              <View style={{ marginLeft: wp(2) }}>
+                <Text style={styles.summaryNumber}>$7500</Text>
+                <Text style={styles.summaryLabel}>
+                  Rent collected Sep 2025
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Chart Section */}
+          {/* Chart Header with Filter Button */}
+<View style={styles.chartHeader}>
+  <TouchableOpacity
+    style={styles.chartTitleRow}
+    onPress={() => setFilterModalVisible(true)}
+    activeOpacity={0.7}
+  >
+    <Text style={styles.chartTitle}>
+      Rent Collection (Last {selectedFilter})
+    </Text>
+    <AppIcon name={icons.arrowDown} size={wp(4)} color={Colors.black} />
+  </TouchableOpacity>
+</View>
+
+      
+
+<LineChart
+  data={chartData}
+  width={screenWidth * 0.85}
+  height={hp(22)}
+  chartConfig={chartConfig}
+  bezier
+  withInnerLines={false}
+  style={{
+    borderRadius: 15,
+  }}
+  transparent={true}  // ← ADD THIS PROP
+/>
+
+          {/* Footer Summary */}
+          <View style={styles.footerSummary}>
+            <View style={styles.footerItem}>
+              <Text style={styles.footerNumber}>04</Text>
+              <Text style={styles.footerLabel}>Vacant Properties</Text>
+            </View>
+            <View style={styles.footerItem}>
+              <Text style={[styles.footerNumber, { color: Colors.red }]}>
+                08
+              </Text>
+              <Text style={styles.footerLabel}>Occupied</Text>
+            </View>
+            <View style={styles.footerItem}>
+              <Text style={styles.footerNumber}>$2.4K</Text>
+              <Text style={styles.footerLabel}>Monthly Income</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Quick Links */}
+        <View style={styles.quickLinksContainer}>
+          <Text style={styles.sectionTitle}>Quick Links</Text>
+          <View style={styles.quickLinksRow}>
+            {quickLinks.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.linkCard}
+                onPress={item.action}
+              >
+                <View style={styles.iconCircle}>
+                  <AppIcon name={item.icon} size={wp(8)} />
+                </View>
+                <Text style={styles.linkText}>{item.title}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+        
+         {/* Filter Modal */}
+        <Modal
+          visible={filterModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFilterModalVisible(false)}
+        >
+          <TouchableWithoutFeedback
+            onPress={() => setFilterModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Select Time Range</Text>
+                {["7 Days", "1 Month", "3 Months", "1 Year"].map((option) => (
                   <TouchableOpacity
-                    key={index}
-                    style={[styles.actionCard, {backgroundColor: action.color}]}
-                    onPress={action.action}>
-                    <AppIcon
-                      name={action.icon}
-                      size={wp(8)}
-                      style={styles.actionIcon}
-                    />
-                    <Text style={styles.actionText}>{action.title}</Text>
+                    key={option}
+                    style={[
+                      styles.optionButton,
+                      selectedFilter === option && styles.selectedOption,
+                    ]}
+                    onPress={() => handleFilterSelect(option)}
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        selectedFilter === option && styles.selectedOptionText,
+                      ]}
+                    >
+                      {option}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
-
-            <Text style={styles.subtitle}>Select Property Type:</Text>
-
-            {selectedPropertyType ? (
-              <View style={styles.checkboxContainer}>
-                <AppIcon
-                  name={propertyTypes[selectedPropertyType]}
-                  size={wp(18)}
-                  style={styles.checkboxImage}
-                />
-                <Text style={styles.checkboxText}>{selectedPropertyType}</Text>
-                <View style={styles.checkboxWrapper}>
-                  <TouchableOpacity onPress={() => setIsChecked(!isChecked)}>
-                    <AppIcon
-                      name={isChecked ? icons.tick : icons.unTick}
-                      size={wp(8)}
-                      style={{marginLeft: 20}}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : null}
-
-            <View style={styles.proceedContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  {backgroundColor: isChecked ? '#174135' : '#999'},
-                ]}
-                onPress={handleProceed}
-                disabled={!isChecked}>
-                <Text style={styles.submitButtonText}>Manage Property</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.dropdownLabel}>
-              Switch Property Type:
-            </Text>
-            
-            <Dropdown
-              style={[styles.dropdown, styles.dropdownBorder]}
-              selectedTextStyle={styles.selectedTextStyle}
-              placeholderStyle={styles.placeholderStyle}
-              imageStyle={styles.imageStyle}
-              iconStyle={styles.iconStyle}
-              activeColor={'#517068'}
-              maxHeight={200}
-              containerStyle={styles.dropdownContainer}
-              value={selectedPropertyType}
-              fontFamily={getFontFamily('bold')}
-              itemTextStyle={styles.dropdownItemText}
-              data={dropdownData}
-              valueField="value"
-              labelField="label"
-              imageField="image"
-              placeholder={
-                <Text style={styles.dropdownPlaceholder}>
-                  {selectedPropertyType ? selectedPropertyType : 'Select Property Type'}
-                </Text>
-              }
-              searchPlaceholder="Search property type..."
-              onPress={handleDropdownChange}
-              onChange={item => handleDropdownChange(item.label)}
-              renderOption={(option, selected) => (
-                <View
-                  style={[
-                    styles.dropdownOption,
-                    selected && styles.dropdownOptionSelected,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.dropdownOptionText,
-                      selected && styles.dropdownOptionTextSelected,
-                    ]}>
-                    {option.label}
-                  </Text>
-                </View>
-              )}
-            />
-
-            {/* Property Summary Cards */}
-            <View style={styles.summaryContainer}>
-              <Text style={styles.sectionTitle}>Property Overview</Text>
-              <View style={styles.summaryGrid}>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNumber}>12</Text>
-                  <Text style={styles.summaryLabel}>Total Properties</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNumber}>8</Text>
-                  <Text style={styles.summaryLabel}>Occupied</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNumber}>4</Text>
-                  <Text style={styles.summaryLabel}>Vacant</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryNumber}>$2.4L</Text>
-                  <Text style={styles.summaryLabel}>Monthly Income</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-    
-    {/* </View> */}
-    </>
+          </TouchableWithoutFeedback>
+        </Modal>
+        
+      </ScrollView>
+    </Container>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  scrollViewContainer: {
-    flexGrow: 1,
-    paddingBottom: 90,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: 'white',
-    fontFamily: getFontFamily('bold'),
-  },
-  title: {
-    fontSize: wp(6),
-    color: Colors.primary,
-    fontFamily: getFontFamily('bold'),
-    marginBottom: 5,
-  },
-  welcomeText: {
-    fontSize: wp(4),
-    color: '#666',
-    fontFamily: getFontFamily('medium'),
-    marginBottom: 20,
-  },
-  subtitle: {
-    fontSize: wp(5),
-    marginTop: 20,
-    fontFamily: getFontFamily('bold'),
-    color: Colors.primary,
-  },
-  sectionTitle: {
-    fontSize: wp(4.5),
-    fontFamily: getFontFamily('bold'),
-    color: Colors.primary,
-    marginBottom: 15,
-  },
-  quickActionsContainer: {
-    marginBottom: 20,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  actionCard: {
-    width: wp(42),
-    height: hp(12),
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  actionIcon: {
-    marginBottom: 5,
-    tintColor: 'white',
-  },
-  actionText: {
-    color: 'white',
-    fontSize: wp(3.5),
-    fontFamily: getFontFamily('bold'),
-    textAlign: 'center',
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    backgroundColor: '#f5f5f5',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  checkboxImage: {
-    width: wp(7),
-    height: hp(7),
-    marginRight: 10,
-    backgroundColor: '#f5f5f5',
-  },
-  checkboxText: {
-    fontSize: wp(5),
-    fontFamily: getFontFamily('bold'),
-    color: Colors.primary,
-    flex: 1,
-  },
-  checkboxWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 1,
-    borderRadius: 50,
-  },
-  proceedContainer: {
-    alignItems: 'center',
-    marginTop: 20,
-    borderRadius: 20,
-  },
-  submitButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: wp(6),
-    height: hp(7),
-    width: wp(90),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: wp(4),
-    fontFamily: getFontFamily('bold'),
-  },
-  dropdownLabel: {
-    marginTop: 40,
-    fontFamily: getFontFamily('bold'),
-    fontSize: wp(4),
-    color: '#174135',
-  },
-  dropdown: {
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: 5,
-    marginTop: 10,
-    paddingHorizontal: 20,
-    height: hp(7),
-  },
-  dropdownBorder: {
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  iconStyle: {
-    height: hp(4),
-    width: wp(5),
-  },
-  dropdownContainer: {
-    borderWidth: 1,
-    color: Colors.primary,
-    borderColor: Colors.primary,
-    marginTop: -4,
-    borderBottomLeftRadius: 7,
-    borderBottomRightRadius: 7,
-  },
-  dropdownItemText: {
-    color: Colors.primary,
-    fontSize: wp(4),
-  },
-  dropdownPlaceholder: {
-    color: Colors.primary,
-    fontFamily: getFontFamily('medium'),
-  },
-  placeholderStyle: {
-    fontSize: wp(4),
-  },
-  dropdownOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    color: Colors.primary,
-    borderColor: Colors.primary,
-    borderRadius: 5,
-    backgroundColor: '#f5f5f5',
-    marginBottom: 10,
-  },
-  dropdownOptionSelected: {
-    backgroundColor: Colors.primary,
-  },
-  dropdownOptionText: {
-    fontSize: wp(4),
-    color: Colors.primary,
-  },
-  dropdownOptionTextSelected: {
-    color: 'white',
-  },
-  selectedTextStyle: {
-    color: Colors.primary,
-    fontSize: wp(3),
-  },
-  summaryContainer: {
-    marginTop: 30,
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(0.5),
   },
   summaryCard: {
-    width: wp(42),
-    height: hp(10),
-    backgroundColor: '#f8f9fa',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+       backgroundColor: "rgba(255, 255, 255, 0.7)",
+    borderRadius: 15,
+    padding: wp(4),
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 3,
+    marginVertical: hp(1),
+ borderWidth: 2,
+  borderColor: "rgba(229, 57, 53, 0.2)",
+    },
+  summaryTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: hp(2),
+  },
+  summaryItem: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   summaryNumber: {
-    fontSize: wp(6),
-    fontFamily: getFontFamily('bold'),
+    fontSize: wp(5),
+    fontFamily: getFontFamily("bold"),
     color: Colors.primary,
   },
   summaryLabel: {
-    fontSize: wp(3.5),
-    fontFamily: getFontFamily('medium'),
-    color: '#666',
-    textAlign: 'center',
+    fontSize: wp(3),
+    color: "#666",
+    fontFamily: getFontFamily("medium"),
+  },
+  chartContainer: {
+    alignItems: "flex-start",
+  },
+chartHeader: {
+  marginBottom: hp(1),
+},
+
+chartTitleRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "flex-start",
+},
+
+chartTitle: {
+  fontSize: wp(3.8),
+  fontFamily: getFontFamily("bold"),
+  color: Colors.black,
+  marginRight: wp(3), // spacing before icon
+},
+
+filterButton: {
+  paddingHorizontal: wp(1), // subtle tap area
+  paddingVertical: wp(0.5),
+},
+
+chartWrapper: {
+  backgroundColor: "rgba(255, 255, 255, 0.7)",
+  borderRadius: 15,
+  paddingVertical: hp(1.5),
+  paddingHorizontal: wp(2),
+  shadowColor: "#000",
+  shadowOpacity: 0.05,
+  shadowRadius: 5,
+  elevation: 3,
+  alignItems: "center",
+},
+chartStyle: {
+  borderRadius: 15,
+},
+
+    footerSummary: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: hp(2),
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    paddingTop: hp(1.5),
+  },
+  footerItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  footerNumber: {
+    fontSize: wp(4.5),
+    fontFamily: getFontFamily("bold"),
+    color: Colors.primary,
+  },
+  footerLabel: {
+    fontSize: wp(3),
+    color: "#666",
+    fontFamily: getFontFamily("medium"),
+  },
+  quickLinksContainer: {
+    marginTop: hp(3),
+  },
+  sectionTitle: {
+    fontSize: wp(4.5),
+    fontFamily: getFontFamily("bold"),
+    color: Colors.primary,
+    marginBottom: hp(2),
+  },
+  quickLinksRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
+  },
+  linkCard: {
+    width: wp(20),
+    alignItems: "center",
+    marginBottom: hp(2),
+  },
+  iconCircle: {
+    width: wp(14),
+    height: wp(14),
+    borderRadius: wp(7),
+    backgroundColor: "#FFF4F4",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: hp(0.5),
+    shadowColor: "#E53935",
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  linkText: {
+    fontSize: wp(3),
+    fontFamily: getFontFamily("medium"),
+    textAlign: "center",
+    color: Colors.primary,
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    width: wp(70),
+    borderRadius: 10,
+    paddingVertical: hp(3),
+    paddingHorizontal: wp(5),
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: wp(4),
+    fontFamily: getFontFamily("bold"),
+    color: Colors.red,
+    marginBottom: hp(2),
+  },
+  optionButton: {
+    width: "100%",
+    paddingVertical: hp(1.5),
+    borderRadius: 8,
+    alignItems: "center",
+    marginVertical: hp(0.5),
+    backgroundColor: "#f7f7f7",
+  },
+  optionText: {
+    fontSize: wp(3.8),
+    color: Colors.black,
+    fontFamily: getFontFamily("medium"),
+  },
+  selectedOption: {
+    backgroundColor: Colors.red,
+  },
+  selectedOptionText: {
+    color: "#fff",
   },
 
 });

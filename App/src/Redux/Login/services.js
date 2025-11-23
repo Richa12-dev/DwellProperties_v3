@@ -90,6 +90,8 @@ const base_url = Config.API_URL;
 
 // Login with new API
 
+
+
 export const login = createAsyncThunk(
   'loginSlice/login',
   async (post, { rejectWithValue }) => {
@@ -110,32 +112,104 @@ export const login = createAsyncThunk(
       const data = await response.json();
 
       if (response.ok && data?.accessToken) {
-        Toast.show('Login successful');
+        Toast.show('Login successfully');
+
+          console.log(data.accessToken, "fsdfghjgf");
+        // 🔥 DECODE THE ID TOKEN TO GET USER INFO
+        let landlordId = null;
+        let tenantId = null;
+        let contractorId = null;
+        let role = 'tenant';
+        let email = '';
+        let firstName = '';
+        let lastName = '';
+        let phoneNumber = '';
+
+        if (data.idToken) {
+          try {
+            // Decode JWT token (it's base64 encoded)
+            const tokenParts = data.idToken.split('.');
+            const payload = JSON.parse(
+              Buffer.from(tokenParts[1], 'base64').toString()
+            );
+            
+            console.log('🔓 Decoded Token Payload:', payload);
+
+            // Extract user data from token
+            email = payload.email || '';
+            firstName = payload.given_name || '';
+            lastName = payload.family_name || '';
+            phoneNumber = payload.phone_number || '';
+            role = payload['custom:role'] || 'tenant';
+            landlordId = payload['custom:landlordId'] || null;
+            tenantId = payload['custom:tenantId'] || null;
+            contractorId = payload['custom:contractorId'] || null;
+
+            // If custom attributes don't exist, check cognito:groups
+            if (!landlordId && !tenantId && !contractorId) {
+              const groups = payload['cognito:groups'] || [];
+              console.log('📋 Cognito Groups:', groups);
+              
+              if (groups.includes('landlord')) {
+                // Use the sub (user ID) as landlordId if not explicitly set
+                landlordId = payload.sub;
+                role = 'landlord';
+                console.log('✅ Identified as LANDLORD from groups');
+              } else if (groups.includes('tenant')) {
+                tenantId = payload.sub;
+                role = 'tenant';
+                console.log('✅ Identified as TENANT from groups');
+              } else if (groups.includes('contractor')) {
+                contractorId = payload.sub;
+                role = 'contractor';
+                console.log('✅ Identified as CONTRACTOR from groups');
+              }
+            }
+          } catch (decodeError) {
+            console.error('❌ Error decoding token:', decodeError);
+          }
+        }
 
         const userData = {
           accessToken: data.accessToken,
           idToken: data.idToken,
           refreshToken: data.refreshToken,
-          landlordId: data.user?.landlordId || null,
-          tenantId: data.user?.tenantId || null,
-          contractorId: data.user?.contractorId || null,
-          role: data.user?.role || 'tenant',
-          email: data.user?.email || '',
-          firstName: data.user?.firstName || '',
-          lastName: data.user?.lastName || '',
-          phoneNumber: data.user?.phoneNumber || '',
+          landlordId: landlordId,
+          tenantId: tenantId,
+          contractorId: contractorId,
+          role: role,
+          email: email,
+          firstName: firstName,
+          lastName: lastName,
+          phoneNumber: phoneNumber,
         };
 
-        // Navigate based on role
+        console.log('✅ Final userData:', userData);
+        console.log('🚀 Navigation Decision:', {
+          hasLandlordId: !!landlordId,
+          hasTenantId: !!tenantId,
+          hasContractorId: !!contractorId,
+          role: role,
+          navigatingTo: tenantId ? 'BottomFotter (Tenant)' :
+                       landlordId ? 'ProfileFooter (Landlord)' :
+                       contractorId ? 'ContractorHome (Contractor)' :
+                       'BottomFotter (Default)'
+        });
+
+        // Navigate based on role/IDs
         setTimeout(() => {
-          if (data.user?.tenantId) {
+          if (tenantId) {
+            console.log('🏠 Navigating to: BottomFotter');
             resetRoot('BottomFotter');
-          } else if (data.user?.landlordId) {
+          } else if (landlordId) {
+            console.log('🏢 Navigating to: ProfileFooter');
             resetRoot('ProfileFooter');
-          } else if (data.user?.contractorId) {
-            resetRoot('ContractorHome'); // Adjust based on your navigation
+          } else if (contractorId) {
+            console.log('🔧 Navigating to: ContractorHome');
+            resetRoot('ContractorHome');
           } else {
-            resetRoot('BottomFotter'); // default fallback
+            console.log('⚠️ Navigating to: BottomFotter (Default)');
+            resetRoot('BottomFotter');
           }
         }, 300);
 
@@ -152,6 +226,88 @@ export const login = createAsyncThunk(
     }
   }
 );
+
+
+//
+//export const login = createAsyncThunk(
+//  'loginSlice/login',
+//  async (post, { rejectWithValue }) => {
+//    const url = `${base_url}/login`;
+//
+//    try {
+//      const response = await fetch(url, {
+//        method: 'POST',
+//        headers: {
+//          'Content-Type': 'application/json',
+//        },
+//        body: JSON.stringify({
+//          email: post?.email || post?.username,
+//          password: post?.password,
+//        }),
+//      });
+//
+//      const data = await response.json();
+//        
+//        // 🔍 ADD THIS DEBUG LOG
+//              console.log('📊 Full API Response:', JSON.stringify(data, null, 2));
+//              console.log('👤 User data:', data.user);
+//              console.log('🏠 Landlord ID:', data.user?.landlordId);
+//              console.log('🏢 Tenant ID:', data.user?.tenantId);
+//        
+//      if (response.ok && data?.accessToken) {
+//        Toast.show('Login successful');
+//
+//        const userData = {
+//          accessToken: data.accessToken,
+//          idToken: data.idToken,
+//          refreshToken: data.refreshToken,
+//          landlordId: data.user?.landlordId || null,
+//          tenantId: data.user?.tenantId || null,
+//          contractorId: data.user?.contractorId || null,
+//          role: data.user?.role || 'tenant',
+//          email: data.user?.email || '',
+//          firstName: data.user?.firstName || '',
+//          lastName: data.user?.lastName || '',
+//          phoneNumber: data.user?.phoneNumber || '',
+//        };
+//          
+//          // 🔍 ADD THIS DEBUG LOG TOO
+//                  console.log('✅ Navigation Decision:', {
+//                    hasLandlordId: !!data.user?.landlordId,
+//                    hasTenantId: !!data.user?.tenantId,
+//                    hasContractorId: !!data.user?.contractorId,
+//                    willNavigateTo: data.user?.tenantId ? 'BottomFotter' :
+//                                   data.user?.landlordId ? 'ProfileFooter' :
+//                                   data.user?.contractorId ? 'ContractorHome' :
+//                                   'BottomFotter (default)'
+//                  });
+//          
+//        // Navigate based on role
+//        setTimeout(() => {
+//          if (data.user?.tenantId) {
+//            resetRoot('BottomFotter');
+//          } else if (data.user?.landlordId) {
+//            resetRoot('ProfileFooter');
+//          } else if (data.user?.contractorId) {
+//            resetRoot('ContractorHome'); // Adjust based on your navigation
+//          } else {
+//            resetRoot('BottomFotter'); // default fallback
+//          }
+//        }, 300);
+//
+//        return userData;
+//      } else {
+//        const errorMessage = data?.message || data?.error || 'Invalid credentials';
+//        Toast.show(errorMessage);
+//        return rejectWithValue(errorMessage);
+//      }
+//    } catch (err) {
+//      console.error('Login error:', err);
+//      Toast.show('Oops, there seems to be an error');
+//      return rejectWithValue(err.message || 'Oops, there seems to be an error');
+//    }
+//  }
+//);
 
 export const registerUser = createAsyncThunk(
   'loginSlice/registerUser',

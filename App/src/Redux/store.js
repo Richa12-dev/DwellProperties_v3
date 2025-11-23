@@ -6,7 +6,9 @@ import { loginReducer } from './Login/loginSlice';
 // import { chatReducer } from './Ai/aiSlice';
 import aiReducer from './Ai/aiSlice';
 import { propertiesReducer } from './Properties/propertiesSlice';
-import queriesReducer from './Queries/queriesSlice'; 
+//import queriesReducer from './Queries/queriesSlice';
+import maintenanceReducer from './Maintenance/maintenanceSlice';
+
 
 // import { disbursalReducer } from './Disbursal/disbursalSlice';
 // import { leadGenerationReducer } from './LeadGneration/leadGenerationSlice';
@@ -25,12 +27,26 @@ const propertiesPersistConfig = {
   blacklist: ['loading', 'error'], // Don't persist loading and error states
 };
 
+// Separate persist config for AI chat
+const aiPersistConfig = {
+  key: 'ai',
+  storage: AsyncStorage,
+  whitelist: ['currentSessionId', 'messages'], // Only keep relevant data
+};
+
+
+
 const rootReducer = combineReducers({
   loginData: loginReducer,
   // chat: chatReducer,
-    ai: aiReducer,
-      queries: queriesReducer,
+//    ai: aiReducer,
+//      queries: queriesReducer,
+    ai: persistReducer(aiPersistConfig, aiReducer),
    properties: persistReducer(propertiesPersistConfig, propertiesReducer),
+    maintenance: maintenanceReducer,
+   
+    
+    
   // disbursalData: disbursalReducer,
   // payoutData: payoutReducer,
   // leadGenerationData:leadGenerationReducer,

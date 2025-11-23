@@ -1,450 +1,593 @@
-import React, { useEffect, useMemo, useCallback } from 'react';
-import { RefreshControl, FlatList } from 'react-native';
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
+import { RefreshControl, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import Toast from 'react-native-simple-toast';
 import {
-  Box, Text, VStack, HStack, Button, Divider, Badge,
-  StatusBar as RNStatusBar, Spinner, Spacer,
+  View, Box, Text, VStack, HStack, Button, Badge,
+  Spinner, Pressable, Image,
 } from 'native-base';
+import Modal from 'react-native-modal';
 import { Colors } from '../../Theme';
-import CollectionNavBar from '../../components/CollectionNavBar/CollectionNavBar';
 import { getLandlordProperties, deleteProperty } from '../../Redux/Properties/services';
 import { propertiesSelectors } from '../../Redux/Properties/propertiesSlice';
-import { Image } from 'native-base';
-import Swiper from 'react-native-swiper';
 import { useNavigation } from '@react-navigation/native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Container from '../../components/Container/Container';
+import PropertyFilters from '../../components/PropertyFilters/PropertyFilters';
+import AddPropertiesScreen from './AddPropertiesScreen';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
+import { AppIcon } from "../../components/AppIcon";
+import { icons } from "../../Assets";
+import PropertyCard from '../../components/PropertyCard/PropertyCard';
 
-// Memoized Property Card Component
-const PropertyCard = React.memo(({ property, index, onViewDetails, onEdit, onDelete }) => {
-  const status = useMemo(() => {
-    return property.is_available 
-      ? { label: 'Available', color: 'green' }
-      : { label: 'Occupied', color: 'red' };
-  }, [property.is_available]);
 
-  const propertyInfo = useMemo(() => {
-    const bedrooms = property.bedrooms || 'N/A';
-    const bathrooms = property.bathrooms || 'N/A';
-    const rent = property.monthly_rent ? `$${property.monthly_rent}/mo` : 'N/A';
-    return `${bedrooms}BR/${bathrooms}BA • ${rent}`;
-  }, [property.bedrooms, property.bathrooms, property.monthly_rent]);
 
-  const address = useMemo(() => {
-    const parts = [];
-    if (property.address) parts.push(property.address);
-    if (property.city) parts.push(property.city);
-    if (property.state) parts.push(property.state);
-    if (property.zip_code) parts.push(property.zip_code);
-    return parts.join(', ');
-  }, [property.address, property.city, property.state, property.zip_code]);
 
-  const renderPropertyImage = useMemo(() => {
-    if (!property.images || property.images.length === 0) {
-      return (
-        <Image
-          source={require('../../Assets/Image/empty-box.png')}
-          alt="Property"
-          w="100%"
-          h="100%"
-          resizeMode="cover"
-        />
-      );
+// Tenant Card Component
+const TenantCard = React.memo(({ tenant }) => {
+  const getStatusColor = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'paid': return 'green.500';
+      case 'pending': return 'orange.500';
+      case 'overdue': return 'red.500';
+      case 'in progress': return 'blue.500';
+      default: return 'gray.500';
     }
+  };
 
-    if (property.images.length === 1) {
-      return (
-        <Image
-          source={{
-            uri: property.images[0].startsWith('data:image')
-              ? property.images[0]
-              : `data:image/jpeg;base64,${property.images[0]}`,
-          }}
-          alt="Property"
-          w="100%"
-          h="100%"
-          resizeMode="cover"
-          fallbackSource={require('../../Assets/Image/empty-box.png')}
-        />
-      );
-    }
-
-    // For multiple images, only render Swiper when visible
-    return (
-      <Swiper 
-        autoplay={false} // Disable autoplay for better performance
-        loop 
-        showsPagination={false}
-        loadMinimal={true} // Load only visible slides
-        loadMinimalSize={1}
-      >
-        {property.images.slice(0, 3).map((img, idx) => { // Limit to 3 images
-          let source = null;
-          if (typeof img === 'string') {
-            source = {
-              uri: img.startsWith('data:image')
-                ? img
-                : `data:image/jpeg;base64,${img}`,
-            };
-          } else if (img.uri) {
-            source = { uri: img.uri };
-          } else if (img.base64) {
-            source = { uri: `data:image/jpeg;base64,${img.base64}` };
-          }
-          return (
-            <Image
-              key={idx}
-              source={source}
-              alt={`Property-${idx}`}
-              w="100%"
-              h="100%"
-              resizeMode="cover"
-              fallbackSource={require('../../Assets/Image/empty-box.png')}
-            />
-          );
-        })}
-      </Swiper>
-    );
-  }, [property.images]);
-
-  const propertyId = property.id || property.ID;
+  const tenantName = tenant?.name || tenant?.tenant_name || tenant?.firstName + ' ' + tenant?.lastName || 'N/A';
+  const tenantAddress = tenant?.address || tenant?.property_address || 'No address';
+  const tenantStatus = tenant?.status || tenant?.payment_status || 'Pending';
+  const tenantAvatar = tenant?.avatar || tenant?.profile_image || tenant?.photo;
 
   return (
-    <Box
-      bg="white"
-      p={4}
-      rounded="xl"
-      shadow={2}
-      borderWidth={1}
-      borderColor="gray.100"
-      mb={4}
-    >
-      {/* Header */}
-      <HStack justifyContent="space-between" alignItems="flex-start">
-        <Text fontSize="lg" bold numberOfLines={2} flex={1} mr={2}>
-          {property.name || 'Unnamed Property'}
-        </Text>
-        <Badge
-          colorScheme={status.color}
-          rounded="md"
-          variant="subtle"
-          px={3}
-          py={1}
-        >
-          {status.label}
-        </Badge>
-      </HStack>
+    <Pressable mb={4}>
+      <Box bg="white" rounded="2xl" overflow="hidden" shadow={3} style={styles.cardShadow}>
+        <HStack p={4} space={3} alignItems="center">
+          <Box
+            w={12}
+            h={12}
+            rounded="full"
+            bg="gray.200"
+            justifyContent="center"
+            alignItems="center"
+            overflow="hidden"
+          >
+            {tenantAvatar ? (
+              <Image
+                source={{ uri: tenantAvatar }}
+                alt={tenantName}
+                w="100%"
+                h="100%"
+                resizeMode="cover"
+              />
+            ) : (
+              <Text fontSize="xl" fontWeight="bold" color="gray.600">
+                {tenantName?.charAt(0) || 'T'}
+              </Text>
+            )}
+          </Box>
 
-      {/* Image + Info */}
-      <HStack space={3} alignItems="flex-start" mt={3}>
-        <Box w={24} h={24} rounded="md" overflow="hidden">
-          {renderPropertyImage}
-        </Box>
-
-        <VStack flex={1} space={2}>
-          {address && (
-            <Text fontSize="sm" color="gray.600" numberOfLines={2}>
-              📍 {address}
+          <VStack flex={1} space={1}>
+            <Text fontSize="md" fontWeight="bold" color="gray.800">
+              {tenantName}
             </Text>
-          )}
-          <Text fontSize="sm" color="gray.600">
-            🏠 {propertyInfo}
-          </Text>
-          {property.property_type && (
-            <Text fontSize="sm" color="blue.600" fontWeight="medium">
-              🏢 {property.property_type}
+            <Text fontSize="sm" color="gray.500" numberOfLines={1}>
+              {tenantAddress}
             </Text>
-          )}
-        </VStack>
-      </HStack>
+          </VStack>
 
-      {/* Actions */}
-      <Divider mt={3} />
-      <HStack space={2} mt={2} alignItems="center">
-        <Button
-          size="sm"
-          variant="ghost"
-          colorScheme="blue"
-          onPress={() => onViewDetails(property)}
-        >
-          View Details
-        </Button>
-        <Spacer />
-        <Button
-          size="sm"
-          variant="outline"
-          colorScheme="blue"
-          onPress={() => onEdit(property)}
-        >
-          Edit
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          colorScheme="red"
-          onPress={() => onDelete(propertyId)}
-        >
-          Delete
-        </Button>
-      </HStack>
-    </Box>
+          <Badge
+            bg={getStatusColor(tenantStatus)}
+            rounded="lg"
+            px={3}
+            py={1}
+            _text={{
+              fontSize: "xs",
+              fontWeight: "600",
+              color: "white"
+            }}
+          >
+            {tenantStatus}
+          </Badge>
+        </HStack>
+      </Box>
+    </Pressable>
   );
 });
 
-// Memoized Statistics Component
-const StatisticsHeader = React.memo(({ totalProperties, totalUnits, occupiedUnits, vacantUnits, onAddProperty, hasProperties, loading }) => (
-  <VStack space={4} mb={4}>
-    {/* Statistics Cards */}
-    <HStack space={2}>
-      <Box flex={1} bg="white" p={3} rounded="lg" shadow={1}>
-        <Text fontSize="xs" color="gray.500">Total Properties</Text>
-        <Text fontSize="xl" bold color="blue.600">{totalProperties || 0}</Text>
-      </Box>
-      <Box flex={1} bg="white" p={3} rounded="lg" shadow={1}>
-        <Text fontSize="xs" color="gray.500">Total Units</Text>
-        <Text fontSize="xl" bold color="blue.600">{totalUnits || 0}</Text>
-      </Box>
-      <Box flex={1} bg="white" p={3} rounded="lg" shadow={1}>
-        <Text fontSize="xs" color="gray.500">Occupied</Text>
-        <Text fontSize="xl" bold color="green.600">{occupiedUnits || 0}</Text>
-      </Box>
-      <Box flex={1} bg="white" p={3} rounded="lg" shadow={1}>
-        <Text fontSize="xs" color="gray.500">Vacant</Text>
-        <Text fontSize="xl" bold color="orange.600">{vacantUnits || 0}</Text>
-      </Box>
-    </HStack>
+// Statistics Header Component
+const StatisticsHeader = React.memo(({ totalProperties, vacantCount, occupiedCount }) => (
+  <View style={styles.glassCard}>
+    <Box style={styles.glassCardInner}>
+      <HStack justifyContent="space-around" mb={hp(2)}>
+        <VStack alignItems="center" flex={1}>
+          <HStack alignItems="center" space={2}>
+            <AppIcon name={icons.totalProperties} size={wp(6)} />
+            <Text fontSize={hp(2.5)} bold color={Colors.black}>{totalProperties}</Text>
+          </HStack>
+          <Text fontSize={hp(1.6)} color={Colors.textGray} mt={1}>Total Properties</Text>
+        </VStack>
 
-    {/* No properties message */}
-    {!hasProperties && !loading && (
-      <Box bg="white" p={8} rounded="xl" shadow={2} alignItems="center">
-        <Text color="gray.500" fontSize="md">No properties found</Text>
-        <Text color="gray.400" fontSize="sm" mt={1} textAlign="center">
-          Add your first property to get started
-        </Text>
-        <Button mt={4} size="sm" onPress={onAddProperty}>
-          Add Property
-        </Button>
-      </Box>
-    )}
-  </VStack>
+        <VStack alignItems="center" flex={1}>
+          <HStack alignItems="center" space={2}>
+                      <AppIcon name={icons.closes} size={wp(6)} />
+            <Text style={{ fontSize: hp(2.5), fontWeight: 'bold',}}>{vacantCount}</Text>
+          </HStack>
+          <Text fontSize={hp(1.6)} color={Colors.textGray} mt={1}>Available</Text>
+        </VStack>
+
+        <VStack alignItems="center" flex={1}>
+          <HStack alignItems="center" space={2}>
+                                <AppIcon name={icons.ok} size={wp(6)} />
+            <Text style={{ fontSize: hp(2.5), fontWeight: 'bold',  }}>{occupiedCount}</Text>
+          </HStack>
+          <Text fontSize={hp(1.6)} color={Colors.textGray} mt={1}>Occupied</Text>
+        </VStack>
+      </HStack>
+    </Box>
+  </View>
 ));
 
+// Main Component
 const LandlordProperties = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
 
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [editPropertyData, setEditPropertyData] = useState(null);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState('properties');
+
+  // Filter states
+  const [favorites, setFavorites] = useState([]);
+  const [selectedPropertyType, setSelectedPropertyType] = useState('all');
+  const [selectedAvailability, setSelectedAvailability] = useState('all');
+  const [selectedTenantStatus, setSelectedTenantStatus] = useState('all');
+
+  // Redux selectors - Properties
+  const propertiesData = useSelector(propertiesSelectors.getPropertiesData) || {};
   const {
-    landlordProperties,
-    loading,
-    error,
-    totalProperties,
-    totalUnits,
-    occupiedUnits,
-    vacantUnits
-  } = useSelector(propertiesSelectors.getPropertiesData);
+    landlordProperties = [],
+    loading = false,
+    error = null,
+    totalProperties = 0,
+    vacantUnits = 0,
+    occupiedUnits = 0,
+  } = propertiesData;
 
-  // Memoized selectors for better performance
-  const authData = useSelector(state => state.loginData || state.login || {});
-  const authToken = useMemo(() => authData?.token, [authData]);
-  const landlordId = useMemo(() => authData?.userData?.landlordId || authData?.user?.landlordId, [authData]);
+  // Redux selectors - Tenants (adjust these selectors based on your Redux structure)
+  const tenantsData = useSelector(state => state?.tenants?.tenantsData || state?.tenants || {});
+  const {
+    tenants = [],
+    loading: tenantsLoading = false,
+    error: tenantsError = null,
+    totalTenants = 0,
+  } = tenantsData;
 
-  // Memoized computed values
-  const hasProperties = useMemo(() => landlordProperties && landlordProperties.length > 0, [landlordProperties]);
-  const isAuthenticated = useMemo(() => Boolean(landlordId && authToken), [landlordId, authToken]);
+  // Auth safe fetch
+  const authData = useSelector(state => state?.loginData || state?.login || {});
+  const authToken = authData?.accessToken || authData?.token || null;
+  const landlordId = authData?.landlordId || authData?.userData?.landlordId || authData?.user?.landlordId || null;
 
-  // Fetch properties effect
+  const isAuthenticated = Boolean(landlordId && authToken);
+  const hasProperties = landlordProperties.length > 0;
+  const hasTenants = tenants.length > 0;
+
+  // Load properties from Redux
   useEffect(() => {
-    if (isAuthenticated) {
-      dispatch(getLandlordProperties({ 
-        landlordId: landlordId,
-        token: authToken 
-      }));
-    } else {
-      console.warn('Missing auth data:', { landlordId: !!landlordId, authToken: !!authToken });
+    if (landlordId && authToken) {
+      dispatch(getLandlordProperties({ landlordId, token: authToken }));
+      // Dispatch action to fetch tenants
+      // dispatch(getLandlordTenants({ landlordId, token: authToken }));
     }
-  }, [dispatch, landlordId, authToken, isAuthenticated]);
+  }, [dispatch, landlordId, authToken]);
 
-  // Memoized callbacks
   const handleRefresh = useCallback(() => {
     if (isAuthenticated) {
-      dispatch(getLandlordProperties({ 
-        landlordId: landlordId,
-        token: authToken 
-      }));
+      dispatch(getLandlordProperties({ landlordId, token: authToken }));
+      // Refresh tenants
+      // dispatch(getLandlordTenants({ landlordId, token: authToken }));
     } else {
-      Toast.show('Please login again to view properties');
+      Toast.show('Please login again');
     }
   }, [dispatch, landlordId, authToken, isAuthenticated]);
 
-  const handleAddProperty = useCallback(() => {
-    navigation.navigate('AddPropertiesScreen');
-  }, [navigation]);
+  const handleAddProperty = () => {
+    setEditPropertyData(null);
+    setShowModal(true);
+  };
 
-  const handleViewDetails = useCallback((property) => {
-    navigation.navigate('PropertyDetails', { property });
-  }, [navigation]);
+  const handleViewDetails = property => {
+    navigation.navigate('PropertiesDetails', { property });
+  };
 
-  const handleEdit = useCallback((property) => {
-    navigation.navigate('AddPropertiesScreen', { propertyData: property });
-  }, [navigation]);
+  const handleEdit = property => {
+    setEditPropertyData(property);
+    setShowModal(true);
+  };
 
-  const handleDeleteProperty = useCallback((propertyId) => {
-    if (!isAuthenticated) {
-      Toast.show('Please login again to delete properties');
-      return;
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditPropertyData(null);
+    handleRefresh();
+  };
+
+  const handleDeleteProperty = async propertyId => {
+    if (!isAuthenticated) return Toast.show('Please login again');
+    try {
+      await dispatch(deleteProperty({ propertyId, token: authToken, landlordId })).unwrap();
+      Toast.show('Property deleted successfully');
+      handleRefresh();
+    } catch (err) {
+      console.error('Delete property error:', err);
+      Toast.show(err?.message || 'Failed to delete property');
     }
+  };
 
-    dispatch(deleteProperty({ 
-      propertyId: propertyId, 
-      token: authToken, 
-      landlordId: landlordId 
-    }))
-      .unwrap()
-      .then(() => {
-        console.log('Property deleted successfully, refreshing list');
-        handleRefresh();
-      })
-      .catch(err => {
-        console.error('Delete property error:', err);
-        Toast.show(err || 'Failed to delete property');
-      });
-  }, [dispatch, authToken, landlordId, isAuthenticated, handleRefresh]);
+  const handleToggleFavorite = id => {
+    setFavorites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
-  // Memoized key extractor
-  const keyExtractor = useCallback((item, index) => String(item.id || item.ID || index), []);
+  // Calculate property type counts
+  const propertyTypeCounts = useMemo(() => {
+    return landlordProperties.reduce((acc, prop) => {
+      const type = prop?.property_type || 'Other';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+  }, [landlordProperties]);
 
-  // Memoized render item
-  const renderItem = useCallback(({ item: property, index }) => (
-    <PropertyCard
-      property={property}
-      index={index}
-      onViewDetails={handleViewDetails}
-      onEdit={handleEdit}
-      onDelete={handleDeleteProperty}
-    />
-  ), [handleViewDetails, handleEdit, handleDeleteProperty]);
+  // Calculate vacant and occupied counts
+  const availabilityCounts = useMemo(() => {
+    const vacant = landlordProperties.filter(p =>
+      p?.availability === 'available' || p?.is_available
+    ).length;
+    const occupied = landlordProperties.length - vacant;
+    return { vacant, occupied };
+  }, [landlordProperties]);
 
-  // Memoized header component
-  const listHeader = useMemo(() => (
-    <StatisticsHeader
-      totalProperties={totalProperties}
-      totalUnits={totalUnits}
-      occupiedUnits={occupiedUnits}
-      vacantUnits={vacantUnits}
-      onAddProperty={handleAddProperty}
-      hasProperties={hasProperties}
-      loading={loading}
-    />
-  ), [totalProperties, totalUnits, occupiedUnits, vacantUnits, handleAddProperty, hasProperties, loading]);
+  // Calculate tenant status counts from Redux data
+  const tenantStatusCounts = useMemo(() => {
+    return tenants.reduce((acc, tenant) => {
+      const status = (tenant?.status || tenant?.payment_status || 'pending').toLowerCase();
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+  }, [tenants]);
 
-  // Loading state
-  if (loading && !hasProperties) {
+  // Filter and sort properties
+  const filteredAndSortedProperties = useMemo(() => {
+    let filtered = landlordProperties.filter(prop => {
+      // Property Type Filter
+      const typeMatch = selectedPropertyType === 'all' || prop?.property_type === selectedPropertyType;
+      
+      // Availability Filter
+      const isAvailable = prop?.availability === 'available' || prop?.is_available;
+      const availMatch =
+        selectedAvailability === 'all' ||
+        (selectedAvailability === 'vacant' && isAvailable) ||
+        (selectedAvailability === 'occupied' && !isAvailable);
+      
+      return typeMatch && availMatch;
+    });
+
+    // Sort by most recent
+    return filtered.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  }, [landlordProperties, selectedPropertyType, selectedAvailability]);
+
+  // Filter tenants from Redux
+  const filteredTenants = useMemo(() => {
+    if (selectedTenantStatus === 'all') {
+      return tenants;
+    }
+    return tenants.filter(tenant => {
+      const tenantStatus = (tenant?.status || tenant?.payment_status || 'pending').toLowerCase();
+      return tenantStatus === selectedTenantStatus.toLowerCase();
+    });
+  }, [selectedTenantStatus, tenants]);
+
+  // Determine current loading and error states
+  const currentLoading = activeTab === 'properties' ? loading : tenantsLoading;
+  const currentError = activeTab === 'properties' ? error : tenantsError;
+  const hasData = activeTab === 'properties' ? hasProperties : hasTenants;
+
+  // UI Conditions
+  if (currentLoading && !hasData) {
     return (
-      <>
-        <RNStatusBar
-          backgroundColor={Colors.black || Colors.red || "#FF0000"}
-          barStyle="light-content"
-          translucent={false}
-        />
-        <CollectionNavBar />
-        <Box flex={1} bg="#f5f5f5" justifyContent="center" alignItems="center">
-          <Spinner size="lg" color="blue.500" />
-          <Text mt={4} fontSize="md" color="gray.600">Loading properties...</Text>
+      <Container>
+        <Box flex={1} justifyContent="center" alignItems="center">
+          <Spinner color="#E53935" size="lg" />
+          <Text mt={4} fontSize="md" color="gray.600">
+            Loading {activeTab === 'properties' ? 'properties' : 'tenants'}...
+          </Text>
         </Box>
-      </>
+      </Container>
     );
   }
 
-  // Authentication check
   if (!isAuthenticated) {
     return (
-      <>
-        <RNStatusBar
-          backgroundColor={Colors.black || Colors.red || "#FF0000"}
-          barStyle="light-content"
-          translucent={false}
-        />
-        <CollectionNavBar />
-        <Box flex={1} bg="#f5f5f5" justifyContent="center" alignItems="center">
-          <Text fontSize="lg" color="red.500">Please login as a landlord to view properties</Text>
-          <Button mt={4} onPress={() => navigation.navigate('Login')}>
-            Go to Login
+      <Container>
+        <Box flex={1} justifyContent="center" alignItems="center" px={6}>
+          <MaterialIcons name="lock-outline" size={64} color="#E53935" />
+          <Text mt={4} fontSize="lg" fontWeight="bold" textAlign="center">
+            Authentication Required
+          </Text>
+          <Text mt={2} fontSize="sm" color="gray.500" textAlign="center">
+            Please login to view your {activeTab}
+          </Text>
+          <Button mt={6} bg="#E53935" onPress={() => navigation.navigate('Login')} px={8}>
+            Login
           </Button>
         </Box>
-      </>
+      </Container>
     );
   }
 
-  // Error state
-  if (error) {
+  if (currentError) {
     return (
-      <>
-        <RNStatusBar
-          backgroundColor={Colors.black || Colors.red || "#FF0000"}
-          barStyle="light-content"
-          translucent={false}
-        />
-        <CollectionNavBar />
-        <Box flex={1} bg="#f5f5f5" justifyContent="center" alignItems="center" px={4}>
-          <Text fontSize="lg" color="red.500" textAlign="center">
-            Error loading properties
+      <Container>
+        <Box flex={1} justifyContent="center" alignItems="center" px={6}>
+          <MaterialIcons name="error-outline" size={64} color="#E53935" />
+          <Text mt={4} fontSize="lg" fontWeight="bold" textAlign="center">
+            Error Loading {activeTab === 'properties' ? 'Properties' : 'Tenants'}
           </Text>
-          <Text fontSize="sm" color="gray.600" textAlign="center" mt={2}>
-            {error}
+          <Text fontSize="sm" color="gray.500" mt={2} textAlign="center">
+            {currentError}
           </Text>
-          <Button mt={4} onPress={handleRefresh}>
+          <Button mt={6} bg="#E53935" onPress={handleRefresh} px={8}>
             Retry
           </Button>
         </Box>
-      </>
+      </Container>
     );
   }
 
   return (
-    <>
-      <RNStatusBar
-        backgroundColor={Colors.black || Colors.red || "#FF0000"}
-        barStyle="light-content"
-        translucent={false}
-      />
-      <CollectionNavBar />
+    <Container>
+      <FlatList
+        data={activeTab === 'properties' ? filteredAndSortedProperties : filteredTenants}
+        keyExtractor={(item, index) => {
+          if (activeTab === 'properties') {
+            return String(item?.property_id || item?.id || item?.ID || index);
+          } else {
+            return String(item?.tenant_id || item?.id || item?.ID || index);
+          }
+        }}
+        renderItem={({ item }) => (
+          activeTab === 'properties' ? (
+            <PropertyCard
+              property={item}
+              onViewDetails={handleViewDetails}
+              onEdit={handleEdit}
+              onDelete={handleDeleteProperty}
+              onToggleFavorite={handleToggleFavorite}
+              isFavorite={favorites.includes(item?.property_id || item?.id || item?.ID)}
+            />
+          ) : (
+            <TenantCard tenant={item} />
+          )
+        )}
+        refreshControl={
+          <RefreshControl
+            refreshing={currentLoading}
+            onRefresh={handleRefresh}
+            tintColor="#E53935"
+            colors={["#E53935"]}
+          />
+        }
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+        ListHeaderComponent={
+          <VStack space={4} mb={4}>
+            <StatisticsHeader
+              totalProperties={totalProperties || landlordProperties.length}
+              vacantCount={availabilityCounts.vacant}
+              occupiedCount={availabilityCounts.occupied}
+              totalTenants={totalTenants || tenants.length}
+              activeTab={activeTab}
+            />
+            
+            {/* Tab Switcher */}
+            <Box
+              width={370}
+              height={50}
+              borderRadius={100}
+              borderWidth={1}
+              borderColor="rgba(255,255,255,0.3)"
+              bg="rgba(255,255,255,0.7)"
+              flexDirection="row"
+              alignSelf="center"
+              overflow="hidden"
+              mb={4}
+            >
+              <Box
+                position="absolute"
+                top={0}
+                left={activeTab === 'properties' ? 0 : '50%'}
+                width="50%"
+                height="100%"
+                bg="#E53935"
+                borderRadius={100}
+              />
 
-      <HStack
-        justifyContent="space-between"
-        alignItems="center"
-        px={4}
-        py={3}
-        bg="white"
-        shadow={2}
-      >
-        <Text fontSize="xl" bold>My Properties</Text>
-        <Button
-          size="sm"
-          bg="black"
-          _text={{ color: 'white' }}
+              {[
+                { key: 'properties', label: 'Properties', count: totalProperties || landlordProperties.length },
+                { key: 'tenants', label: 'Tenants', count: totalTenants || tenants.length },
+              ].map(tab => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    flex={1}
+                    onPress={() => setActiveTab(tab.key)}
+                    style={{ justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    <HStack alignItems="center" space={1}>
+                      <Text
+                        fontSize="sm"
+                        fontWeight="600"
+                        color={isActive ? "white" : "gray.600"}
+                      >
+                        {tab.label}
+                      </Text>
+                      <Badge
+                        bg={isActive ? "white" : "gray.300"}
+                        rounded="full"
+                        px={3}
+                        _text={{
+                          fontSize: "xs",
+                          fontWeight: "bold",
+                          color: isActive ? "#E53935" : "gray.600"
+                        }}
+                      >
+                        {tab.count}
+                      </Badge>
+                    </HStack>
+                  </Pressable>
+                );
+              })}
+            </Box>
+
+            {/* Conditional Filters */}
+            <PropertyFilters
+              activeTab={activeTab}
+              // Properties filters
+              selectedPropertyType={selectedPropertyType}
+              onPropertyTypeChange={setSelectedPropertyType}
+              selectedAvailability={selectedAvailability}
+              onAvailabilityChange={setSelectedAvailability}
+              propertyTypeCounts={propertyTypeCounts}
+              vacantCount={availabilityCounts.vacant}
+              occupiedCount={availabilityCounts.occupied}
+              // Tenants filters
+              selectedTenantStatus={selectedTenantStatus}
+              onTenantStatusChange={setSelectedTenantStatus}
+              tenantStatusCounts={tenantStatusCounts}
+            />
+          </VStack>
+        }
+        ListEmptyComponent={
+          <Box alignItems="center" justifyContent="center" py={10}>
+            <MaterialIcons
+              name={activeTab === 'properties' ? 'home-work' : 'people-outline'}
+              size={80}
+              color="#E0E0E0"
+            />
+            <Text fontSize="lg" color="gray.500" mt={4}>
+              {activeTab === 'properties' ? 'No properties found' : 'No tenants found'}
+            </Text>
+            <Text fontSize="sm" color="gray.400" mt={2} textAlign="center" px={10}>
+              {activeTab === 'properties'
+                ? (selectedPropertyType !== 'all' || selectedAvailability !== 'all'
+                    ? 'Try adjusting your filters to see more results'
+                    : 'Add your first property to get started')
+                : (selectedTenantStatus !== 'all'
+                    ? 'Try adjusting your filters to see more results'
+                    : 'No tenants available at the moment')
+              }
+            </Text>
+            {activeTab === 'properties' &&
+             (selectedPropertyType !== 'all' || selectedAvailability !== 'all') && (
+              <Button
+                mt={4}
+                bg="#E53935"
+                onPress={() => {
+                  setSelectedPropertyType('all');
+                  setSelectedAvailability('all');
+                }}
+                _text={{ fontSize: "sm", fontWeight: "600" }}
+              >
+                Clear Filters
+              </Button>
+            )}
+            {activeTab === 'tenants' && selectedTenantStatus !== 'all' && (
+              <Button
+                mt={4}
+                bg="#E53935"
+                onPress={() => setSelectedTenantStatus('all')}
+                _text={{ fontSize: "sm", fontWeight: "600" }}
+              >
+                Clear Filters
+              </Button>
+            )}
+          </Box>
+        }
+      />
+
+      {activeTab === 'properties' && (
+        <TouchableOpacity
+          style={styles.fabButton}
           onPress={handleAddProperty}
         >
-          + Add Property
-        </Button>
-      </HStack>
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
 
-      <FlatList
-        data={landlordProperties || []}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
-        }
-        contentContainerStyle={{ padding: 16 }}
-        ListHeaderComponent={listHeader}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={30}
-        initialNumToRender={10}
-        windowSize={10}
-        getItemLayout={undefined} // Let FlatList calculate automatically for better performance
-      />
-    </>
+      <Modal
+        isVisible={showModal}
+        onBackdropPress={handleCloseModal}
+        style={{ margin: 0 }}
+        animationIn="slideInRight"
+        animationOut="slideOutRight"
+        backdropOpacity={0.5}
+      >
+        <AddPropertiesScreen
+          onClose={handleCloseModal}
+          propertyData={editPropertyData}
+        />
+      </Modal>
+    </Container>
   );
 };
+
+const styles = StyleSheet.create({
+  cardShadow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  fabButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.black,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  fabText: {
+    color: 'white',
+    fontSize: 28,
+  },
+  glassCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+    overflow: "hidden",
+  },
+  glassCardInner: { padding: hp(2) },
+});
 
 export default LandlordProperties;

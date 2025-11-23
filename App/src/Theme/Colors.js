@@ -30,7 +30,7 @@ export default {
   lightBlueBorder: '#0AAAC1',
   disabled: 'rgba(192,192,192,.1)',
   green: '#24D104',
-  red: '#fa0f0fff',
+  red: '#E53935',
   blueTextColor: '#4169e1',
   blueHeadingColor: '#4169e1',
   lightBg1: '#f0aad9',

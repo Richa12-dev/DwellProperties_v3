@@ -6,6 +6,7 @@ import {
   View,
   Dimensions,
   SafeAreaView,
+  Image,
 } from 'react-native';
 
 import {
@@ -16,7 +17,8 @@ import Swiper from 'react-native-swiper';
 import FastImage from 'react-native-fast-image';
 import { Colors } from '../../Theme';
 import { getFontFamily } from '../../utils';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { icons } from '../../Assets';
+import {AppIcon} from '../../components/AppIcon';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -104,7 +106,7 @@ const OnboardingScreen = ({ navigation }) => {
               />
             </View>
             
-            <View style={styles.textContent}>
+            <View style={styles.textContents}>
               <Text style={styles.title}>Smart{'\n'}DIY Assistance</Text>
               <Text style={styles.description}>
                 Get step-by-step fixes for common issues with tool suggestions and trusted Amazon links - all powered by our AI assistant.
@@ -123,7 +125,7 @@ const OnboardingScreen = ({ navigation }) => {
               <TouchableOpacity 
                 style={styles.backButton} 
                 onPress={handleBack}>
-                <Icon name="arrow-back" size={24} color="#1F2D3D" />
+<AppIcon name={icons.arrowBack} size={24} />
                 <Text style={styles.backButtonText}>Back</Text>
               </TouchableOpacity>
               <TouchableOpacity 
@@ -187,21 +189,26 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    paddingTop: hp(5),
+    paddingTop: hp(3),
   },
   imageContainer: {
-    height: hp(45),
+    height: hp(47),
     justifyContent: 'center',
     alignItems: 'center',
   },
   animatedImage: {
     width: wp(85),
-    height: hp(45),
+    height: hp(47),
   },
   textContent: {
     paddingHorizontal: wp(10),
     alignItems: 'center',
-    marginTop: hp(1),
+    marginTop: hp(0.5),
+  },
+    textContents: {
+    paddingHorizontal: wp(7.5),
+    alignItems: 'center',
+    marginTop: hp(0.5),
   },
   title: {
     fontSize: wp(6.5),
@@ -226,7 +233,7 @@ const styles = StyleSheet.create({
     paddingBottom: hp(4),
   },
   paginationStyle: {
-    bottom: hp(21),
+    bottom: hp(16),
   },
   dot: {
     width: 8,
@@ -243,7 +250,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(4),
-    marginBottom: hp(2.5),
+    marginBottom: hp(1),
   },
   skipButtonText: {
     color: '#6B7280',
@@ -262,8 +269,15 @@ const styles = StyleSheet.create({
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+   
   },
+  backArrowIcon: {
+  width: wp(5),
+  height: wp(5),
+  resizeMode: 'contain',
+  marginRight: wp(2),
+},
+
   backButtonText: {
     color: '#1F2D3D',
     fontSize: wp(4.2),
@@ -271,7 +285,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   nextButton: {
-    width: wp(24),
+    width: wp(20),
     height: hp(6.5),
     backgroundColor: '#E53935',
     borderRadius: 12,

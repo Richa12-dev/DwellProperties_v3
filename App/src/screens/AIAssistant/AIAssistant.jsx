@@ -8,11 +8,10 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  StatusBar as RNStatusBar,
   Alert,
   Image,
   ActivityIndicator,
-  Linking, 
+  Linking,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -21,10 +20,11 @@ import {
 } from 'react-native-responsive-screen';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { Colors } from '../../Theme';
-import { 
-  sendChatMessage, 
-  sendChatMessageWithImage, 
-  getAISuggestions 
+import Container from '../../components/Container/Container';
+import {
+  sendChatMessage,
+  sendChatMessageWithImage,
+  getAISuggestions,
 } from '../../Redux/Ai/services';
 import {
   setCurrentSessionId,
@@ -34,36 +34,36 @@ import {
   chatSelectors,
 } from '../../Redux/Ai/aiSlice';
 import { loginDataSelectors } from '../../Redux/Login/loginSlice';
-import CollectionNavBar from '../../components/CollectionNavBar/CollectionNavBar';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Hyperlink from 'react-native-hyperlink';
+import { AppIcon } from "../../components/AppIcon";
+import { icons } from "../../Assets";
 
-// Updated MessageItem component with fixed hyperlink handling
+
+// ✅ MessageItem component with proper link handling
 const MessageItem = React.memo(({ msg, index }) => {
   const isUser = msg.type === 'user';
   const isError = msg.isError || false;
   const messageContent = msg.message || msg.text || msg.content || 'No message content';
 
-  const handleLinkPress = useCallback((url, text) => {
-    console.log('Link pressed:', url);
-    
-    // Clean up the URL if it's malformed
-    let cleanUrl = url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      cleanUrl = `https://${url}`;
+  const handleLinkPress = useCallback((url) => {
+    console.log('🔗 Link pressed:', url);
+
+    let cleanUrl = url.trim();
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      cleanUrl = `https://${cleanUrl}`;
     }
-    
+
     Linking.canOpenURL(cleanUrl)
       .then((supported) => {
         if (supported) {
           return Linking.openURL(cleanUrl);
         } else {
-          console.log('Cannot open URL:', cleanUrl);
           Alert.alert('Error', 'Cannot open this link');
         }
       })
       .catch((err) => {
-        console.error('Failed to open URL:', err);
+        console.error('❌ Failed to open URL:', err);
         Alert.alert('Error', 'Could not open the link');
       });
   }, []);
@@ -78,14 +78,14 @@ const MessageItem = React.memo(({ msg, index }) => {
       
       {!isUser && msg.source && (
         <Text style={styles.sourceIndicator}>
-          {msg.source === 'gemini' ? '🤖 Gemini AI' : '🚀 Primary AI'}
+          {msg.source === 'aws' ? '🤖 AI Assistant' : '🚀 AI'}
         </Text>
       )}
 
       {msg.hasImage && msg.imageUri && (
         <View style={styles.messageImageContainer}>
-          <Image 
-            source={{ uri: msg.imageUri }} 
+          <Image
+            source={{ uri: msg.imageUri }}
             style={styles.messageImage}
             resizeMode="cover"
           />
@@ -94,32 +94,26 @@ const MessageItem = React.memo(({ msg, index }) => {
 
       <Hyperlink
         linkDefault={true}
-        linkStyle={{ 
-          color: Colors.primary, 
+        linkStyle={{
+          color: isUser ? '#FFE5E5' : Colors.primary,
           textDecorationLine: 'underline',
-          fontWeight: '500'
+          fontWeight: '500',
         }}
         onPress={handleLinkPress}
         linkText={(url) => {
-          // Clean up display text for Amazon links
           if (url.includes('amazon.com')) {
-            if (url.includes('/dp/')) {
-              return 'Amazon Link';
-            } else if (url.includes('/s?k=')) {
-              return 'Search on Amazon';
-            }
+            if (url.includes('/dp/')) return 'Amazon Link';
+            if (url.includes('/s?k=')) return 'Search on Amazon';
           }
           return url;
-        }}
-      >
+        }}>
         <Text
           style={[
             styles.messageText,
             {
-              color: isUser ? Colors.white : (isError ? '#d32f2f' : Colors.black)
+              color: isUser ? Colors.white : (isError ? '#d32f2f' : Colors.black),
             },
-          ]}
-        >
+          ]}>
           {messageContent}
         </Text>
       </Hyperlink>
@@ -128,67 +122,41 @@ const MessageItem = React.memo(({ msg, index }) => {
         style={[
           styles.timestamp,
           {
-            color: isUser
-              ? 'rgba(255,255,255,0.8)'
-              : (isError ? '#d32f2f' : Colors.gray)
+            color: isUser ? 'rgba(255,255,255,0.8)' : (isError ? '#d32f2f' : Colors.gray),
           },
         ]}>
-        {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : 'Now'}
+        {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
       </Text>
     </View>
   );
 }, (prevProps, nextProps) => {
-  return prevProps.msg.id === nextProps.msg.id && 
-         prevProps.index === nextProps.index;
+  return prevProps.msg.id === nextProps.msg.id &&
+    prevProps.index === nextProps.index;
 });
 
-// Enhanced function to properly format links in AI responses
-const formatLinksInResponse = (text) => {
-  if (!text) return '';
-  
-  // Fix malformed Amazon URLs and other common issues
-  return text
-    // Fix Amazon product URLs
-    .replace(/https:\/\/www\.amazon\.com\/dp\/([A-Z0-9]+)([^\s]*)/g, 'https://www.amazon.com/dp/$1')
-    // Fix Amazon search URLs
-    .replace(/https:\/\/www\.amazon\.com\/s\?k=([^→\s]+)/g, 'https://www.amazon.com/s?k=$1')
-    // Remove arrow symbols that might break URLs
-    .replace(/\s*→\s*/g, ' ')
-    // Clean up any double spaces
-    .replace(/\s+/g, ' ')
-    .trim();
-};
-
-const ChatScreen = ({ navigation }) => {
+const AIAssistant = ({ navigation }) => {
   const [messageText, setMessageText] = useState('');
   const [isComponentMounted, setIsComponentMounted] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [isTyping, setIsTyping] = useState(false);
-  
+
   const scrollViewRef = useRef();
   const lastMessageRef = useRef('');
-  const typingTimeoutRef = useRef(null);
   const isMountedRef = useRef(true);
-  const lastScrollTime = useRef(0);
 
   const dispatch = useDispatch();
 
-  // Optimized selectors
-  const chatData = useSelector(chatSelectors.getChatData, (prev, next) => {
-    return prev.loading === next.loading && 
-           prev.messages?.length === next.messages?.length &&
-           prev.error === next.error;
-  });
+  // ✅ Optimized selectors
+  const chatData = useSelector(chatSelectors.getChatData);
   const { loading, messages, currentSessionId, error } = chatData;
 
   const loginData = useSelector(loginDataSelectors.getLoginStatus);
-  const { isLogged, token, userData } = loginData;
+  const { isLogged, token } = loginData;
 
   const rawLoginState = useSelector((state) => state.loginData);
 
-  // Memoized token getter
+  // ✅ Get available token
   const getAvailableToken = useCallback(() => {
     return token ||
       rawLoginState?.token ||
@@ -197,140 +165,96 @@ const ChatScreen = ({ navigation }) => {
       rawLoginState?.userData?.accessToken;
   }, [token, rawLoginState]);
 
-  // Initialize component
-  useEffect(() => {
-    setIsComponentMounted(true);
-    isMountedRef.current = true;
-    dispatch(clearChatError());
+  // ✅ Initialize component
+ // ✅ Ensure session always exists before first send
+useEffect(() => {
+  if (!currentSessionId) {
+    const newSessionId = `session-${Date.now()}`;
+    dispatch(setCurrentSessionId(newSessionId));
+  }
+  dispatch(clearChatError());
+  loadSuggestions('getting started');
 
-    if (!currentSessionId && isLogged) {
-      const sessionId = `session-${Date.now()}`;
-      dispatch(setCurrentSessionId(sessionId));
-    }
+  isMountedRef.current = true;
+  return () => {
+    isMountedRef.current = false;
+  };
+}, [dispatch, currentSessionId]);
 
-    loadSuggestions('getting started');
 
-    return () => {
-      setIsComponentMounted(false);
-      isMountedRef.current = false;
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-    };
-  }, [dispatch, currentSessionId, isLogged]);
-
-  // Throttled auto scroll for better performance
+  // ✅ Auto scroll to bottom
   useEffect(() => {
     if (messages.length > 0 && isComponentMounted) {
-      const now = Date.now();
-      if (now - lastScrollTime.current > 100) { // Throttle to max 10fps
-        lastScrollTime.current = now;
-        requestAnimationFrame(() => {
-          if (isMountedRef.current && scrollViewRef.current) {
-            scrollViewRef.current.scrollToEnd({ animated: true });
-          }
-        });
-      }
+      setTimeout(() => {
+        if (isMountedRef.current && scrollViewRef.current) {
+          scrollViewRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
     }
   }, [messages.length, isComponentMounted]);
-
-  // Reduced loading timeout for better UX
+  
   useEffect(() => {
-    if (loading) {
-      const timeoutId = setTimeout(() => {
-        if (isMountedRef.current) {
-          console.warn('⚠️ Loading timeout - forcing stop');
-          dispatch(setChatLoading(false));
-          Alert.alert(
-            'Request Timeout',
-            'The request is taking longer than expected. Please try again.',
-            [{ text: 'OK' }]
-          );
-        }
-      }, 45000);
+  if (!currentSessionId) {
+    const sessionId = `session-${Date.now()}`;
+    dispatch(setCurrentSessionId(sessionId));
+  }
+}, [currentSessionId, dispatch]);
 
-      return () => clearTimeout(timeoutId);
-    }
-  }, [loading, dispatch]);
 
-  // Debounced suggestions loader
+  // ✅ Load suggestions
   const loadSuggestions = useCallback(async (context) => {
     if (!isMountedRef.current) return;
-    
+
     try {
-      const result = await dispatch(getAISuggestions({ 
-        context, 
-        sessionId: currentSessionId 
+      const result = await dispatch(getAISuggestions({
+        context,
+        sessionId: currentSessionId
       })).unwrap();
-      
+
       if (isMountedRef.current) {
-        setSuggestions(result.suggestions?.slice(0, 3) || []);
+        setSuggestions(result.suggestions?.slice(0, 4) || []);
       }
     } catch (error) {
       if (isMountedRef.current) {
         setSuggestions([
-          "What can you help me with?",
-          "Tell me about your capabilities",
-          "How do I get started?"
+          "My sink is leaking",
+          "Toilet won't flush",
+          "There's a crack in the wall",
+          "How do I fix a dripping tap?"
         ]);
       }
     }
   }, [dispatch, currentSessionId]);
 
-  // Optimized typing handler
-  const handleTyping = useCallback((text) => {
-    setMessageText(text);
-    setIsTyping(text.length > 0);
-    
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    typingTimeoutRef.current = setTimeout(() => {
-      if (isMountedRef.current) {
-        setIsTyping(false);
-      }
-    }, 1000);
-  }, []);
-
-  // Enhanced image picker with better compression
+  // ✅ Handle image picker
   const handleImagePicker = useCallback(() => {
     Alert.alert(
       'Select Image',
       'Choose an image source',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Camera', 
+        {
+          text: 'Camera',
           onPress: () => launchCamera(
-            { 
-              mediaType: 'photo', 
-              quality: 0.3,
-              maxWidth: 600,
-              maxHeight: 600,
-              includeBase64: true,
-              storageOptions: {
-                skipBackup: true,
-                path: 'images',
-              },
-            }, 
+            {
+              mediaType: 'photo',
+              quality: 0.5,
+              maxWidth: 800,
+              maxHeight: 800,
+              saveToPhotos: true,
+            },
             handleImageResponse
           )
         },
-        { 
-          text: 'Gallery', 
+        {
+          text: 'Gallery',
           onPress: () => launchImageLibrary(
-            { 
-              mediaType: 'photo', 
-              quality: 0.3,
-              maxWidth: 600,
-              maxHeight: 600,
-              includeBase64: true,
-              storageOptions: {
-                skipBackup: true,
-                path: 'images',
-              },
-            }, 
+            {
+              mediaType: 'photo',
+              quality: 0.5,
+              maxWidth: 800,
+              maxHeight: 800,
+            },
             handleImageResponse
           )
         },
@@ -339,13 +263,22 @@ const ChatScreen = ({ navigation }) => {
   }, []);
 
   const handleImageResponse = useCallback((response) => {
-    if (response.didCancel || response.error) return;
-    
+    if (response.didCancel) {
+      console.log('User cancelled image picker');
+      return;
+    }
+
+    if (response.error) {
+      console.error('ImagePicker Error:', response.error);
+      Alert.alert('Error', 'Failed to pick image');
+      return;
+    }
+
     if (response.assets && response.assets[0]) {
       const asset = response.assets[0];
+      console.log('✅ Image selected:', asset.uri);
       setSelectedImage({
         uri: asset.uri,
-        base64: asset.base64,
         type: asset.type,
         fileName: asset.fileName,
       });
@@ -356,119 +289,107 @@ const ChatScreen = ({ navigation }) => {
     setSelectedImage(null);
   }, []);
 
-  // Fixed send message handler - clears image preview immediately
-  const handleSendMessage = useCallback(async (messageOverride = null, isImageMessage = false) => {
-    const trimmedMessage = (messageOverride || messageText).trim();
+  const handleSendMessage = useCallback(async (messageOverride = null) => {
+  const trimmedMessage = (messageOverride || messageText).trim();
 
-    if (!trimmedMessage && !selectedImage) {
-      Alert.alert('Empty Message', 'Please enter a message or select an image.');
-      return;
+  if (!trimmedMessage && !selectedImage) {
+    Alert.alert('Empty Message', 'Please enter a message or select an image.');
+    return;
+  }
+
+  if (trimmedMessage === lastMessageRef.current && !selectedImage) {
+    console.log('⚠️ Duplicate message prevented');
+    return;
+  }
+
+  if (!isLogged) {
+    Alert.alert('Login Required', 'Please login to use the chat feature.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Login', onPress: () => navigation.navigate('Login') }
+    ]);
+    return;
+  }
+
+  const availableToken = getAvailableToken();
+  if (!availableToken) {
+    Alert.alert('Authentication Error', 'Please logout and login again.', [
+      { text: 'OK', onPress: () => navigation.navigate('Login') }
+    ]);
+    return;
+  }
+
+  // ✅ Ensure a session ID exists before sending
+  let sessionIdToUse = currentSessionId;
+  if (!sessionIdToUse) {
+    sessionIdToUse = `session-${Date.now()}`;
+    dispatch(setCurrentSessionId(sessionIdToUse));
+  }
+
+  if (loading) {
+    console.log('⚠️ Already loading, skipping...');
+    return;
+  }
+
+  const currentImage = selectedImage;
+
+  // Clear inputs immediately
+  if (!messageOverride) {
+    setMessageText('');
+  }
+  setSelectedImage(null);
+  lastMessageRef.current = trimmedMessage;
+  setShowSuggestions(false);
+
+  try {
+    const messageParams = {
+      message: trimmedMessage,
+      sessionId: sessionIdToUse, // ✅ guaranteed not null now
+      token: availableToken,
+    };
+
+    let result;
+    if (currentImage) {
+      console.log('📤 Sending message with image...');
+      messageParams.imageUri = currentImage.uri;
+      result = await dispatch(sendChatMessageWithImage(messageParams)).unwrap();
+    } else {
+      console.log('📤 Sending text message...');
+      result = await dispatch(sendChatMessage(messageParams)).unwrap();
     }
 
-    if (trimmedMessage === lastMessageRef.current && !selectedImage) {
-      console.log('⚠️ Duplicate message prevented');
-      return;
-    }
+    console.log('✅ Message sent successfully:', result);
 
-    if (!isLogged) {
-      Alert.alert('Login Required', 'Please login to use the chat feature.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Login', onPress: () => navigation.navigate('Login') }
-      ]);
-      return;
-    }
-
-    const availableToken = getAvailableToken();
-    if (!availableToken) {
-      Alert.alert(
-        'Authentication Error',
-        'No authentication token found. Please logout and login again.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Logout', onPress: () => navigation.navigate('Login') }
-        ]
-      );
-      return;
-    }
-
-    if (!currentSessionId) {
-      Alert.alert('Session Error', 'Please restart the app and try again.');
-      return;
-    }
-
-    if (loading) return;
-
-    // Store current image state before clearing
-    const currentImage = selectedImage;
-
-    // Clear inputs IMMEDIATELY for better UX and to prevent double display
-    if (!messageOverride) {
-      setMessageText('');
-    }
-    setSelectedImage(null); // Clear image preview immediately
-    
-    lastMessageRef.current = trimmedMessage;
-    setShowSuggestions(false);
-
-    try {
-      const messageParams = {
-        message: trimmedMessage,
-        sessionId: currentSessionId,
-        token: availableToken,
-      };
-
-      if (currentImage) {
-        if (!currentImage.base64 || !currentImage.type) {
-          Alert.alert('Invalid Image', 'Failed to retrieve image data. Please try selecting the image again.');
-          // Restore image if validation fails
-          setSelectedImage(currentImage);
-          return;
-        }
-
-        messageParams.image = currentImage.base64;
-        messageParams.imageMimeType = currentImage.type;
-        messageParams.imageUri = currentImage.uri;
-      }
-
-      const action = currentImage ? sendChatMessageWithImage : sendChatMessage;
-      const result = await dispatch(action(messageParams)).unwrap();
-
-      // Apply link formatting BEFORE setting suggestions or storing the message
-      const formattedResponse = formatLinksInResponse(result.response);
-
-      if (formattedResponse && isMountedRef.current) {
-        setTimeout(() => {
-          loadSuggestions(formattedResponse.substring(0, 100));
-        }, 100);
-      }
-
-      // Clear last message reference after delay
+    if (result.response && isMountedRef.current) {
       setTimeout(() => {
-        lastMessageRef.current = '';
-      }, 1000);
-
-    } catch (error) {
-      console.error('❌ Failed to send message:', error);
-
-      // Restore inputs on error
-      if (!messageOverride) {
-        setMessageText(trimmedMessage);
-      }
-      if (currentImage) {
-        setSelectedImage(currentImage);
-      }
-      lastMessageRef.current = '';
-
-      Alert.alert(
-        'Message Failed',
-        typeof error === 'string' ? error : 'Failed to send message. Please try again.',
-        [{ text: 'OK' }]
-      );
+        loadSuggestions(result.response.substring(0, 100));
+      }, 500);
     }
-  }, [messageText, selectedImage, isLogged, currentSessionId, loading, getAvailableToken, dispatch, navigation, loadSuggestions]);
+
+    setTimeout(() => {
+      lastMessageRef.current = '';
+    }, 1000);
+  } catch (error) {
+    console.error('❌ Failed to send message:', error);
+
+    // Restore inputs on error
+    if (!messageOverride) {
+      setMessageText(trimmedMessage);
+    }
+    if (currentImage) {
+      setSelectedImage(currentImage);
+    }
+    lastMessageRef.current = '';
+
+    Alert.alert(
+      'Message Failed',
+      typeof error === 'string' ? error : 'Failed to send message. Please try again.',
+      [{ text: 'OK' }]
+    );
+  }
+}, [messageText, selectedImage, isLogged, currentSessionId, loading, getAvailableToken, dispatch, navigation, loadSuggestions]);
 
   const handleSuggestionPress = useCallback((suggestion) => {
-    handleSendMessage(suggestion, false);
+    handleSendMessage(suggestion);
   }, [handleSendMessage]);
 
   const handleClearChat = useCallback(() => {
@@ -484,7 +405,8 @@ const ChatScreen = ({ navigation }) => {
             dispatch(clearChatMessages());
             lastMessageRef.current = '';
             setShowSuggestions(true);
-            setSelectedImage(null); // Clear any selected image
+            setSelectedImage(null);
+            setMessageText('');
             setTimeout(() => loadSuggestions('getting started'), 0);
           }
         }
@@ -492,12 +414,11 @@ const ChatScreen = ({ navigation }) => {
     );
   }, [dispatch, loadSuggestions]);
 
-  // Memoized render functions for better performance
+  // ✅ Render functions
   const renderMessage = useCallback((msg, index) => (
     <MessageItem key={msg.id || `msg-${index}`} msg={msg} index={index} />
   ), []);
 
-  // Fixed suggestions rendering with proper hyperlink handling
   const renderSuggestions = useMemo(() => {
     if (!showSuggestions || suggestions.length === 0 || messages.length > 0) {
       return null;
@@ -505,115 +426,70 @@ const ChatScreen = ({ navigation }) => {
 
     return (
       <View style={styles.suggestionsContainer}>
-        <Text style={styles.suggestionsTitle}>💡 Suggestions:</Text>
-        {suggestions.map((suggestion, index) => {
-          // Check if suggestion contains links
-          const hasLinks = /https?:\/\/[^\s]+/.test(suggestion);
-          
-          if (hasLinks) {
-            return (
-              <View key={`suggestion-${index}`} style={styles.suggestionButton}>
-                <Hyperlink
-                  linkDefault={true}
-                  linkStyle={{ 
-                    color: Colors.primary, 
-                    textDecorationLine: 'underline',
-                    fontWeight: '600'
-                  }}
-                  onPress={(url, text) => {
-                    console.log('Suggestion link pressed:', url);
-                    let cleanUrl = url;
-                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                      cleanUrl = `https://${url}`;
-                    }
-                    Linking.openURL(cleanUrl).catch(err => {
-                      console.error('Failed to open suggestion URL:', err);
-                      Alert.alert('Error', 'Could not open the link');
-                    });
-                  }}
-                >
-                  <Text style={styles.suggestionText}>
-                    {suggestion}
-                  </Text>
-                </Hyperlink>
-              </View>
-            );
-          } else {
-            return (
-              <TouchableOpacity
-                key={`suggestion-${index}`}
-                style={styles.suggestionButton}
-                onPress={() => handleSuggestionPress(suggestion)}
-              >
-                <Text style={styles.suggestionText}>
-                  {suggestion}
-                </Text>
-              </TouchableOpacity>
-            );
-          }
-        })}
+        <Text style={styles.suggestionsTitle}>Suggestions:</Text>
+        {suggestions.map((suggestion, index) => (
+          <TouchableOpacity
+            key={`suggestion-${index}`}
+            style={styles.suggestionButton}
+            onPress={() => handleSuggestionPress(suggestion)}>
+            <Text style={styles.suggestionText}>{suggestion}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     );
   }, [showSuggestions, suggestions, messages.length, handleSuggestionPress]);
 
-  // Memoized status text
-  const statusText = useMemo(() => {
-    if (loading) return '🤖 AI is thinking...';
-    if (isTyping) return '✏️ You are typing...';
-    return `💬 ${messages.length} messages`;
-  }, [loading, isTyping, messages.length]);
-
-  // Memoized input placeholder
-  const inputPlaceholder = useMemo(() => {
-    return selectedImage ? "Describe what you see..." : "Type your message...";
-  }, [selectedImage]);
-
   return (
-    <>
-      <RNStatusBar
-        backgroundColor={Colors.black || Colors.red || "#FF0000"}
-        barStyle="light-content"
-        translucent={false}
-      />
-      <CollectionNavBar />
-
+    <Container>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? hp(10) : 0}>
 
-        <View style={styles.actionBar}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleClearChat}>
-            <Icon name="clear-all" size={hp(2.5)} color={Colors.primary} />
-            <Text style={styles.actionText}>Clear</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.statusText}>{statusText}</Text>
-        </View>
+        {/* Action Bar */}
+{/* 🧊 Glass Action Bar
+<View style={styles.glassActionBar}>
+  <View style={styles.actionBarInner}>
+    <TouchableOpacity
+      style={styles.actionButton}
+      onPress={handleClearChat}>
+      <Icon name="clear-all" size={hp(2.5)} color={Colors.primary} />
+      <Text style={styles.actionText}>Clear</Text>
+    </TouchableOpacity>
 
+    <Text style={styles.statusText}>
+      {loading ? '🤖 AI is thinking...' : `💬 ${messages.length} messages`}
+    </Text>
+  </View>
+</View>
+*/}
+
+        {/* Chat Content */}
         <ScrollView
           ref={scrollViewRef}
           style={styles.chatContainer}
+          contentContainerStyle={styles.chatContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={5}
-          updateCellsBatchingPeriod={50}
-          initialNumToRender={10}
-          windowSize={10}
-          getItemLayout={(data, index) => ({
-            length: hp(8), // Approximate item height
-            offset: hp(8) * index,
-            index,
-          })}>
+          keyboardShouldPersistTaps="handled">
 
+          {/* Welcome Screen */}
           {messages.length === 0 && !loading && (
             <View style={styles.welcomeContainer}>
-              <Text style={styles.welcomeText}>
-                🤖 Hello! I'm your enhanced AI assistant.{'\n'}
-                I can help with text questions and analyze images!
+              <View style={styles.aiIconContainer}>
+                <View style={styles.aiIcon}>
+                <AppIcon name={icons.ailogo} height={hp(9)} width={hp(18)} />
+                </View>
+              </View>
+
+              <Text style={styles.welcomeTitle}>
+                Hello! I'm your{'\n'}enhanced AI Assistant.
               </Text>
+
+              <Text style={styles.welcomeDescription}>
+                I can assist with text-based questions and analyze{'\n'}
+                images to provide quick, accurate insights.
+              </Text>
+
               {!isLogged && (
                 <Text style={styles.loginPrompt}>
                   Please login to start chatting.
@@ -622,8 +498,10 @@ const ChatScreen = ({ navigation }) => {
             </View>
           )}
 
+          {/* Messages */}
           {messages.map(renderMessage)}
 
+          {/* Loading Indicator */}
           {loading && (
             <View style={[styles.messageContainer, styles.botMessage, styles.typingContainer]}>
               <ActivityIndicator size="small" color={Colors.primary} />
@@ -631,103 +509,115 @@ const ChatScreen = ({ navigation }) => {
             </View>
           )}
 
+          {/* Suggestions */}
           {renderSuggestions}
 
         </ScrollView>
 
-        {/* {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={() => dispatch(clearChatError())}>
-              <Text style={styles.dismissText">✕</Text>
-            </TouchableOpacity>
-          </View>
-        )} */}
-
-        {/* Only show image preview if image is selected */}
+        {/* Image Preview */}
         {selectedImage && (
           <View style={styles.imagePreviewContainer}>
-            <Image 
-              source={{ uri: selectedImage.uri }} 
-              style={styles.imagePreview} 
+            <Image
+              source={{ uri: selectedImage.uri }}
+              style={styles.imagePreview}
               resizeMode="cover"
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.removeImageButton}
               onPress={removeSelectedImage}>
-              <Icon name="close" size={hp(2)} color={Colors.white} />
+              <AppIcon name={icons.close} size={hp(1.5)} color={Colors.white} />
             </TouchableOpacity>
           </View>
         )}
 
-        <View style={styles.inputContainer}>
-          <View style={styles.inputWrapper}>
-            <View style={styles.textInputWithIcon}>
-              <TextInput
-                style={styles.textInput}
-                value={messageText}
-                onChangeText={handleTyping}
-                placeholder={inputPlaceholder}
-                placeholderTextColor={Colors.gray}
-                multiline
-                maxLength={1000}
-                editable={!loading}
-                returnKeyType="send"
-                onSubmitEditing={() => handleSendMessage()}
-                blurOnSubmit={false}
-              />
+        {/* Input Container */}
+  {/* 🧊 Styled Input Section */}
+<View style={styles.inputSection}>
+  <View style={styles.inputBox}>
+    <TextInput
+      style={styles.textInput}
+      value={messageText}
+      onChangeText={setMessageText}
+      placeholder={
+        selectedImage
+          ? "Describe what you see..."
+          : "Type your message..."
+      }
+      placeholderTextColor="#555"
+      multiline
+      maxLength={1000}
+      editable={!loading}
+    />
 
-              <TouchableOpacity
-                style={styles.imageIcon}
-                onPress={handleImagePicker}
-                disabled={loading}>
-                <Icon 
-                  name="image" 
-                  size={hp(3)} 
-                  color={loading ? Colors.gray : Colors.primary} 
-                />
-              </TouchableOpacity>
-            </View>
+    <TouchableOpacity
+      style={styles.iconButton}
+      onPress={() => {}}
+      disabled={loading}>
+    <AppIcon name={icons.aiVoice} height={hp(3)} width={hp(3)} />
+    </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                {
-                  backgroundColor: (messageText.trim() || selectedImage) && !loading
-                    ? Colors.primary
-                    : '#ccc',
-                },
-              ]}
-              onPress={() => handleSendMessage()}
-              disabled={loading || (!messageText.trim() && !selectedImage)}>
-              <Icon
-                name="send"
-                size={hp(2.5)}
-                color={Colors.white}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
+    <TouchableOpacity
+      style={styles.iconButton}
+      onPress={handleImagePicker}
+      disabled={loading}>
+                     <AppIcon name={icons.aiImage} height={hp(3)} width={hp(3)} />
+    </TouchableOpacity>
+  </View>
+
+  <TouchableOpacity
+    style={styles.sendButton}
+    onPress={() => handleSendMessage()}
+    disabled={loading || (!messageText.trim() && !selectedImage)}>
+    <AppIcon name={icons.send} height={hp(3)} width={hp(3)} />
+  </TouchableOpacity>
+</View>
+
       </KeyboardAvoidingView>
-    </>
+    </Container>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  actionBar: {
-    backgroundColor: Colors.white,
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1),
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
+glassActionBar: {
+  marginHorizontal: wp(4),
+  marginTop: hp(1),
+  backgroundColor: "rgba(255, 255, 255, 0.7)",
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: "rgba(255, 255, 255, 0.3)",
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.1,
+  shadowRadius: 12,
+  elevation: 5,
+  paddingHorizontal: wp(4),
+  paddingVertical: hp(1.2),
+},
+
+actionBarInner: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+
+glassInputContainer: {
+  backgroundColor: "rgba(255, 255, 255, 0.7)",
+  borderTopWidth: 1,
+  borderColor: "rgba(255, 255, 255, 0.3)",
+  borderRadius: 16,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: -2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 10,
+  marginHorizontal: wp(4),
+  marginBottom: hp(1.5),
+  padding: wp(3),
+},
+
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -736,6 +626,7 @@ const styles = StyleSheet.create({
     marginLeft: wp(1),
     color: Colors.primary,
     fontSize: hp(1.8),
+    fontWeight: '600',
   },
   statusText: {
     fontSize: hp(1.6),
@@ -744,20 +635,48 @@ const styles = StyleSheet.create({
   },
   chatContainer: {
     flex: 1,
+  },
+  chatContent: {
+    flexGrow: 1,
     paddingHorizontal: wp(4),
     paddingVertical: hp(2),
   },
-  welcomeContainer: {
-    flex: 1,
+welcomeContainer: {
+  alignItems: 'center',
+  paddingHorizontal: wp(6),
+  marginTop: hp(-2),   // 🔽 brings icon closer to top
+  marginBottom: hp(2),
+},
+
+  aiIconContainer: {
+    marginBottom: hp(1),
+  },
+  aiIcon: {
+    width: hp(15),
+    height: hp(15),
+    borderRadius: hp(7.5),
+    backgroundColor: Colors.red,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: wp(8),
+    elevation: 8,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
   },
-  welcomeText: {
-    fontSize: hp(2.2),
+  welcomeTitle: {
+    fontSize: hp(3),
+    fontWeight: 'bold',
     color: Colors.black,
     textAlign: 'center',
-    lineHeight: hp(3),
+    marginBottom: hp(2),
+    lineHeight: hp(3.5),
+  },
+  welcomeDescription: {
+    fontSize: hp(1.5),
+    color: Colors.gray,
+    textAlign: 'center',
+    lineHeight: hp(2.5),
     marginBottom: hp(2),
   },
   loginPrompt: {
@@ -765,12 +684,18 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
     textAlign: 'center',
     fontStyle: 'italic',
+    marginTop: hp(2),
   },
   messageContainer: {
     maxWidth: '80%',
     marginVertical: hp(1),
-    padding: wp(3),
+    padding: wp(3.5),
     borderRadius: wp(4),
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   userMessage: {
     alignSelf: 'flex-end',
@@ -778,9 +703,9 @@ const styles = StyleSheet.create({
   },
   botMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   errorMessage: {
     backgroundColor: '#ffebee',
@@ -794,10 +719,10 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: hp(2),
-    lineHeight: hp(2.5),
+    lineHeight: hp(2.6),
   },
   timestamp: {
-    fontSize: hp(1.5),
+    fontSize: hp(1.4),
     marginTop: hp(0.5),
     opacity: 0.7,
   },
@@ -807,8 +732,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   messageImage: {
-    width: wp(40),
-    height: wp(30),
+    width: wp(50),
+    height: wp(35),
     borderRadius: wp(2),
   },
   typingContainer: {
@@ -823,46 +748,33 @@ const styles = StyleSheet.create({
     marginLeft: wp(2),
   },
   suggestionsContainer: {
-    marginTop: hp(2),
+    marginTop: hp(-3),
     paddingHorizontal: wp(2),
   },
   suggestionsTitle: {
     fontSize: hp(1.8),
     fontWeight: '600',
     color: Colors.black,
-    marginBottom: hp(1),
+    marginBottom: hp(1.5),
   },
   suggestionButton: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1.5,
     borderColor: Colors.primary,
     borderRadius: wp(6),
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     marginVertical: hp(0.5),
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   suggestionText: {
     color: Colors.primary,
     fontSize: hp(1.8),
-    textAlign: 'center',
-  },
-  errorContainer: {
-    backgroundColor: '#ffebee',
-    padding: wp(3),
-    marginHorizontal: wp(4),
-    borderRadius: wp(2),
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#c62828',
-    flex: 1,
-  },
-  dismissText: {
-    color: '#c62828',
-    fontWeight: 'bold',
-    fontSize: hp(2),
+    textAlign: 'left',
   },
   imagePreviewContainer: {
     margin: wp(4),
@@ -870,9 +782,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   imagePreview: {
-    width: wp(20),
-    height: wp(20),
-    borderRadius: wp(2),
+    width: wp(25),
+    height: wp(25),
+    borderRadius: wp(3),
     backgroundColor: '#f0f0f0',
   },
   removeImageButton: {
@@ -885,46 +797,71 @@ const styles = StyleSheet.create({
     height: hp(3),
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 3,
   },
   inputContainer: {
     padding: wp(4),
-    backgroundColor: Colors.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  textInputWithIcon: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: wp(6),
-    paddingHorizontal: wp(2),
-    backgroundColor: Colors.white,
-  },
-  textInput: {
-    flex: 1,
-    paddingVertical: hp(1.5),
-    fontSize: hp(2),
-    color: '#333',
-  },
-  imageIcon: {
-    padding: hp(1),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButton: {
-    marginLeft: wp(2),
-    width: hp(5),
-    height: hp(5),
-    borderRadius: hp(2.5),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+inputSection: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginHorizontal: wp(4),
+  marginBottom: hp(1.5),
+},
+
+inputBox: {
+  flexDirection: "row",
+  alignItems: "center",
+  flex: 1,
+  backgroundColor: "#fff",
+  borderRadius: wp(2),
+  borderWidth: 1,
+  borderColor: "#EBAFAF", // light reddish border
+  paddingHorizontal: wp(3),
+  paddingVertical: hp(1),
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 4,
+  elevation: 2,
+},
+
+textInput: {
+  flex: 1,
+  fontSize: hp(2),
+  color: "#000",
+  paddingRight: wp(2),
+  maxHeight: hp(10),
+},
+
+iconButton: {
+  marginLeft: wp(1),
+  paddingHorizontal: wp(1.5),
+},
+
+sendButton: {
+  marginLeft: wp(2),
+  width: hp(6),
+  height: hp(6),
+  borderRadius: hp(3),
+  backgroundColor: "#D64545", // deep red send button
+  justifyContent: "center",
+  alignItems: "center",
+  shadowColor: "#D64545",
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.25,
+  shadowRadius: 4,
+  elevation: 5,
+},
 });
 
-export default ChatScreen;
+export default AIAssistant;

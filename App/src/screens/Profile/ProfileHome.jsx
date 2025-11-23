@@ -1,22 +1,31 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView,   StatusBar as RNStatusBar, 
-  TouchableOpacity, } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+} from 'react-native';
 import { useSelector } from 'react-redux';
 import { loginDataSelectors } from '../../Redux/Login/loginSlice';
 import { Colors } from '../../Theme';
 import CollectionNavBar from '../../components/CollectionNavBar/CollectionNavBar';
-import {getFontFamily} from '../../utils';
-import {icons} from '../../Assets';
-import {AppIcon} from '../../components/AppIcon';
+import { getFontFamily } from '../../utils';
+import { icons } from '../../Assets';
+import { AppIcon } from '../../components/AppIcon';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
+import Container from '../../components/Container/Container';
 
-const ProfileHome = ({navigation}) => {
-  const loginData = useSelector(state => loginDataSelectors.getLoginStatus(state)) || {};
-  const { userData = null, isLogged = false, token = null } = loginData;
+const ProfileHome = ({ navigation }) => {
+  const loginData =
+    useSelector(state => loginDataSelectors.getLoginStatus(state)) || {};
+  const { userData = null, isLogged = false } = loginData;
 
-  console.log('ProfileHome - Login Data:', loginData);
-  console.log('ProfileHome - User Data:', userData);
-
-    const backButton = () => {
+  const backButton = () => {
     navigation.goBack();
   };
 
@@ -30,149 +39,163 @@ const ProfileHome = ({navigation}) => {
     );
   }
 
+const userId = userData?.landlordId || userData?.tenantId || userData?.contractorId || 'N/A';
+
+const fullName = userData?.firstName && userData?.lastName
+     ? `${userData.firstName} ${userData.lastName}`
+     : userData?.name || 'N/A';
+
   return (
-    <>
-  <RNStatusBar
-          backgroundColor={Colors.black || Colors.red || "#FF0000"}
-          barStyle="light-content"
-          translucent={false}
-        />
-        <CollectionNavBar />
+     <Container>
 
-    <ScrollView contentContainerStyle={styles.container}>
-
-           <TouchableOpacity onPress={backButton} style={styles.backButton}>
-            <AppIcon name={icons.backIcon} size={16} />
-            <Text style={styles.headerText}>Profile Details</Text>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity onPress={backButton} style={styles.backButton}>
+          <AppIcon name={icons.arrowBack} size={24} />
           </TouchableOpacity>
-     
-<View style={{ height: 20 }} /> 
-      <View style={styles.infoBox}>
-        <Text style={styles.label}>Email:</Text>
-        <Text style={styles.value}>{userData.email || 'N/A'}</Text>
-      </View>
-
-      <View style={styles.infoBox}>
-        <Text style={styles.label}>Role:</Text>
-        <Text style={styles.value}>{userData.role || 'N/A'}</Text>
-      </View>
-
-      {userData.tenantId && (
-        <View style={styles.infoBox}>
-          <Text style={styles.label}>Tenant ID:</Text>
-          <Text style={styles.value}>{userData.tenantId}</Text>
+          <Text style={styles.headerTitle}>Profile</Text>
         </View>
-      )}
 
-      {userData.landlordId && (
-        <View style={styles.infoBox}>
-          <Text style={styles.label}>Landlord ID:</Text>
-          <Text style={styles.value}>{userData.landlordId}</Text>
+        {/* Profile Card */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileCard}>
+            <View style={styles.avatarContainer}>
+              <Image
+                style={styles.profileImage}
+                source={require('../../Assets/Image/dwellProperties/person.png')}
+              />
+            </View>
+
+            {/* Name and Role */}
+            <View style={styles.nameSection}>
+              <Text style={styles.userName}>{fullName}</Text>
+              <Text style={styles.userRole}>{userData.role || 'Contractor'}</Text>
+            </View>
+
+            {/* Info List (Only Name, Role, ID, Email) */}
+            <View style={styles.infoList}>
+              <InfoItem label="Full Name" value={fullName} />
+              <InfoItem label="Role" value={userData.role || 'Contractor'} />
+              <InfoItem label="User ID" value={userId} />
+              <InfoItem label="Email ID" value={userData.email || 'N/A'} />
+            </View>
+          </View>
         </View>
-      )}
 
-      <View style={styles.infoBox}>
-        <Text style={styles.label}>User Type:</Text>
-        <Text style={styles.value}>
-          {userData.landlordId ? 'Landlord' : userData.tenantId ? 'Tenant' : 'Unknown'}
-        </Text>
-      </View>
-
-      {/* <View style={styles.infoBox}>
-        <Text style={styles.label}>Authentication Status:</Text>
-        <Text style={[styles.value, { color: token ? 'green' : 'red' }]}>
-          {token ? 'Authenticated' : 'Not Authenticated'}
-        </Text>
-      </View> */}
-
-      {userData.userSub && (
-        <View style={styles.infoBox}>
-          <Text style={styles.label}>User Sub:</Text>
-          <Text style={styles.value}>{userData.userSub}</Text>
-        </View>
-      )}
-
-   
-    </ScrollView>
-    </>
+        {/* Logout Button */}
+        <TouchableOpacity style={styles.logoutButton}>
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+</Container>
   );
 };
 
+// ✅ Reusable Info Item
+const InfoItem = ({ label, value }) => (
+  <View style={styles.infoItem}>
+    <View style={styles.infoContent}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    backgroundColor: '#fff',
-    flexGrow: 1,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-    backButton: {
+  headerContainer: {
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('2%'),
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
   },
-  headerText: {
-    fontSize: 22,
-    marginLeft: 10,
-    color: '#1b4339',
-    fontFamily: getFontFamily('bold'),
+  backButton: {
+    marginRight: 15,
   },
-  header: {
+  headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#333',
+    fontFamily: getFontFamily('bold'),
+    color: '#000',
   },
- infoBox: {
-  marginBottom: 15,
-  padding: 20,
-  backgroundColor: '#ffffff',
-  borderRadius: 12,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 3,  // For Android shadow
-  borderWidth: 1,
-  borderColor: '#e0e0e0',
-},
-label: {
-  fontWeight: '700',
-  fontSize: 16,
-  color: '#333',
-  marginBottom: 8,
-},
-value: {
-  fontSize: 16,
-  color: '#555',
-},
-
-
-  messageText: {
-    fontSize: 18,
-    color: '#6c757d',
-    textAlign: 'center',
+  profileSection: {
+    paddingHorizontal: wp('5%'),
+    marginTop: hp('3%'),
   },
-  debugBox: {
-    backgroundColor: '#fff3cd',
-    borderColor: '#ffeeba',
-    marginTop: 20,
+  profileCard: {
+  backgroundColor: 'rgba(255, 255, 255, 0.7)',
+      borderRadius: 20,
+    paddingBottom: hp('3%'),
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
   },
-  debugLabel: {
-    fontWeight: '600',
+  avatarContainer: {
+    alignItems: 'center',
+    marginTop: -50,
+  },
+  profileImage: {
+    width: wp('28%'),
+    height: wp('28%'),
+    borderRadius: wp('14%'),
+    borderWidth: 4,
+    borderColor: '#E3F2FD',
+    backgroundColor: '#E3F2FD',
+  },
+  nameSection: {
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 25,
+  },
+  userName: {
+    fontSize: 24,
+    fontFamily: getFontFamily('bold'),
+    color: '#000',
+  },
+  userRole: {
+    fontSize: 16,
+    fontFamily: getFontFamily('regular'),
+    color: '#666',
+    marginTop: 4,
+  },
+  infoList: {
+    paddingHorizontal: wp('5%'),
+  },
+  infoItem: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
     fontSize: 14,
-    color: '#856404',
-    marginBottom: 5,
+    fontFamily: getFontFamily('medium'),
+    color: '#666',
+    marginBottom: 4,
   },
-  debugText: {
-    fontSize: 12,
-    color: '#856404',
-    fontFamily: 'monospace',
+  infoValue: {
+    fontSize: 16,
+    fontFamily: getFontFamily('semibold'),
+    color: '#000',
+  },
+  logoutButton: {
+    backgroundColor: '#E53E3E',
+    marginHorizontal: wp('5%'),
+    marginTop: hp('3%'),
+    paddingVertical: hp('2%'),
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#E53E3E',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  logoutText: {
+    fontSize: 18,
+    fontFamily: getFontFamily('bold'),
+    color: '#FFF',
   },
 });
 

@@ -107,7 +107,8 @@ locations={[0.3453, 0.7113]}
                             activeOpacity={0.7}
                             hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
                         >
-                            <Icon name="arrow-back" size={24} color="#1F2D3D" />
+                          <AppIcon name={icons.arrowBack} size={24} />
+
                         </TouchableOpacity>
                     </View>
 
@@ -143,6 +144,13 @@ locations={[0.3453, 0.7113]}
                                 outlineColor="#100d0dff"
                                 activeOutlineColor={Colors.black}
                                 theme={{ roundness: 8 }}
+                                  left={
+    <TextInput.Icon
+      icon={() => (
+        <AppIcon name={icons.email} height={hp(2.3)} width={hp(2.3)} />
+      )}
+    />
+  }
                             />
 
                             <TextInput
@@ -155,13 +163,26 @@ locations={[0.3453, 0.7113]}
                                 outlineColor="#100d0dff"
                                 activeOutlineColor={Colors.black}
                                 theme={{ roundness: 8 }}
-                                right={
-                                    <TextInput.Icon
-                                        name={!hidePassword ? 'eye-off' : 'eye'}
-                                        onPress={togglePasswordVisibility}
-                                        forceTextInputFocus={false}
-                                    />
-                                }
+                         left={
+    <TextInput.Icon
+      icon={() => (
+        <AppIcon name={icons.password} height={hp(2.3)} width={hp(2.3)} />
+      )}
+    />
+  }
+  right={
+    <TextInput.Icon
+      icon={() => (
+        <Icon
+          name={hidePassword ? 'visibility-off' : 'visibility'}
+          size={22}
+          color="#838383"
+        />
+      )}
+      onPress={togglePasswordVisibility}
+      forceTextInputFocus={false}
+    />
+  }
                             />
 
                             {/* Forgot Password */}

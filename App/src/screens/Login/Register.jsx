@@ -20,6 +20,10 @@ import { registerUser } from '../../Redux/Login/services';
 import { loginDataSelectors } from '../../Redux/Login/loginSlice';
 import { Colors } from '../../Theme';
 import { getFontFamily } from '../../utils';
+import {AppIcon} from '../../components/AppIcon';
+import { icons } from '../../Assets';
+
+
 
 const roleOptions = [
   { id: 'tenant', name: 'Tenant' },
@@ -119,8 +123,8 @@ const Register = ({ navigation }) => {
               onPress={() => navigation.goBack()}
               activeOpacity={0.7}
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
-              <Icon name="arrow-back" size={24} color="#1F2D3D" />
-            </TouchableOpacity>
+<AppIcon name={icons.arrowBack} size={24} />
+       </TouchableOpacity>
             <Text style={styles.headerTitle}>Register</Text>
           </View>
 

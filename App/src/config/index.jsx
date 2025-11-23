@@ -7,6 +7,10 @@ export const Config = {
   CHAT_API_URL: 'https://lugv3mp9l6.execute-api.us-east-1.amazonaws.com/chat',
   PROPERTIES_API_URL :'https://1vmmxi10ue.execute-api.us-east-1.amazonaws.com/items',
   
+   // Maintenance Authorization API
+  MAINTENANCE_API_URL: 'https://mo4vh9rkai.execute-api.us-east-1.amazonaws.com/prod/maintenanceAuthorization',
+  
+  
   USER_SERVICE: {
     // OAuth2 endpoints (for hosted UI)
     TOKEN_URL: '/oauth2/token',
@@ -34,6 +38,7 @@ export const Config = {
     CONFIRM_SIGN_UP: 'AWSCognitoIdentityProviderService.ConfirmSignUp',
     INITIATE_AUTH: 'AWSCognitoIdentityProviderService.InitiateAuth',
      CHAT: '/chat',
+       MAINTENANCE: '/maintenanceAuthorization',
   },
   
   // Common Headers

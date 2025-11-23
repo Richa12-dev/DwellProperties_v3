@@ -46,7 +46,7 @@ const Login = ({ navigation }) => {
   };
 
   const handleLandlordLogin = () => {
-    navigation.navigate('LandlordLogin');
+    navigation.navigate('LandlordLogin', { userType: 'landlord'});
   };
 
   const handleContractorLogin = () => {

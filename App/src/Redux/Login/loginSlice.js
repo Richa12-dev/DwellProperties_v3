@@ -6,6 +6,9 @@ const initialState = {
   loading: false,
   userData: null,
   token: null,
+    accessToken: null, // ✅ Added accessToken
+     idToken: null,     // ✅ Added idToken
+     refreshToken: null,
   is_logged: false,
 
   // Registration related states
@@ -69,40 +72,66 @@ const loginSlice = createSlice({
     state.userData = {
       landlordId: payload.landlordId || null,
       tenantId: payload.tenantId || null,
-      role: payload.role || 'tenant',
-      email: payload.email || '',
+    contractorId: payload.contractorId || null,
+    role: payload.role || 'tenant',
+    email: payload.email || '',
+    firstName: payload.firstName || '',
+    lastName: payload.lastName || '',
+    phoneNumber: payload.phoneNumber || '',
     };
 
-    const token =
-      payload?.AuthenticationResult?.AccessToken ||
-      payload?.AuthenticationResult?.IdToken ||
-      payload?.AuthenticationResult?.Token ||
-      payload?.accessToken ||
-      payload?.token ||
-      null;
+      // ✅ Extract tokens (support both old and new API structure)
+             const accessToken =
+               payload?.accessToken ||
+               payload?.AuthenticationResult?.AccessToken ||
+               payload?.token ||
+               null;
 
-    state.token = token === 'null' ? null : token;
-    state.is_logged = !!state.token;
-  } else {
-    console.warn('⚠️ login payload is not valid:', payload);
-    state.userData = null;
-    state.token = null;
-    state.is_logged = false;
-  }
+             const idToken =
+               payload?.idToken ||
+               payload?.AuthenticationResult?.IdToken ||
+               null;
 
-  console.log('✔️ Updated login state:', {
-    userData: state.userData,
-    token: state.token,
-    is_logged: state.is_logged,
-  });
-});
+             const refreshToken =
+               payload?.refreshToken ||
+               payload?.AuthenticationResult?.RefreshToken ||
+               null;
+
+             // ✅ Store all tokens
+             state.accessToken = accessToken === 'null' ? null : accessToken;
+             state.token = accessToken === 'null' ? null : accessToken; // Keep for backwards compatibility
+             state.idToken = idToken === 'null' ? null : idToken;
+             state.refreshToken = refreshToken === 'null' ? null : refreshToken;
+             
+             state.is_logged = !!state.accessToken;
+           } else {
+             console.warn('⚠️ login payload is not valid:', payload);
+             state.userData = null;
+             state.token = null;
+             state.accessToken = null;
+             state.idToken = null;
+             state.refreshToken = null;
+             state.is_logged = false;
+           }
+
+           console.log('✔️ Updated login state:', {
+             userData: state.userData,
+             hasAccessToken: !!state.accessToken,
+             hasToken: !!state.token,
+             is_logged: state.is_logged,
+             landlordId: state.userData?.landlordId,
+             role: state.userData?.role,
+           });
+         });
 
 
     builder.addCase(login.rejected, (state) => {
       state.loading = false;
       state.userData = null;
-      state.token = null;
-      state.is_logged = false;
+        state.accessToken = null;
+             state.idToken = null;
+             state.refreshToken = null;
+        state.is_logged = false;
     });
 
     // Register user flow
@@ -226,4 +255,11 @@ export const loginDataSelectors = {
     loading: state.loginData.resetPasswordLoading,
     success: state.loginData.passwordResetSuccess,
   }),
+    
+    // ✅ New helper selectors
+     getAccessToken: (state) => state.loginData.accessToken || state.loginData.token,
+     getLandlordId: (state) => state.loginData.userData?.landlordId || null,
+     getTenantId: (state) => state.loginData.userData?.tenantId || null,
+     getUserRole: (state) => state.loginData.userData?.role || null,
+   
 };

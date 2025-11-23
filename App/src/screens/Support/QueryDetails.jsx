@@ -1,352 +1,290 @@
-import moment from 'moment';
-import React, {useEffect, useState} from 'react';
+import moment from "moment";
+import React, { useEffect, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StatusBar,
+  View,
   StyleSheet,
   Text,
   TouchableOpacity,
+  Modal,
   TouchableWithoutFeedback,
-  View,
-} from 'react-native';
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  SafeAreaView,
+} from "react-native";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
-} from 'react-native-responsive-screen';
-import {useSelector, useDispatch} from 'react-redux';
-import {queriesSelectors, escalateToLevel2, closeQuery} from '../../Redux/Queries/queriesSlice';
-import {icons} from '../../Assets';
-import {AppIcon} from '../../components/AppIcon';
-import CustomButton from '../../components/CustomButton';
-import Header from '../../components/Header';
-import {Colors} from '../../Theme';
-import {getFontFamily} from '../../utils';
-import CollectionNavBar from '../../components/CollectionNavBar/CollectionNavBar';
+} from "react-native-responsive-screen";
+import { Colors } from "../../Theme";
+import { AppIcon } from "../../components/AppIcon";
+import { icons } from "../../Assets";
+import Container from "../../components/Container/Container";
 
-export default function QueryDetails({route, navigation}) {
-  const queryId = route?.params?.data?.queryId || route?.params?.queryId;
-  const dispatch = useDispatch();
-  
-  // Get the latest query data from Redux store
-  const data = useSelector(state => 
-    queriesSelectors.getQueryById(state, queryId)
-  );
+export default function QueryDetails({ route, navigation }) {
+  const data = route?.params?.data || route?.params?.request || {};
 
-  const [tickCount, setTickCount] = useState(1);
-  const [showLevel2, setShowLevel2] = useState(false);
-  const [escalateButtonEnabled, setEscalateButtonEnabled] = useState(false);
-  const [associates, setAssociates] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalMessage, setModalMessage] = useState('');
-  const [el2modalVisible, setEl2modalVisible] = useState(false);
-  const [closeButtonEnabled, setCloseButtonEnabled] = useState(false);
-  const [el2modalMessage, setEl2modalMessage] = useState('');
+  const [modalMessage, setModalMessage] = useState("");
+  const [el2ModalVisible, setEl2ModalVisible] = useState(false);
+  const [el2ModalMessage, setEl2ModalMessage] = useState("");
+  const [escalateButtonEnabled, setEscalateButtonEnabled] = useState(true);
 
-  useEffect(() => {
-    if (!data) return;
-    
-    const queryRaisedTime = moment(data?.queryRaisedTime);
-    const currentTime = moment();
-    const daysDifference = currentTime.diff(queryRaisedTime, 'days');
+  const getStatusText = () =>
+    data?.queryStatusL2 || data?.queryStatusL1 || data?.status || "Unknown";
 
-    if (daysDifference > 8) {
-      setCloseButtonEnabled(false);
-      setEscalateButtonEnabled(false);
-    } else {
-      setCloseButtonEnabled(
-        data?.queryStatusL2 === 'Open' ||
-          (data?.queryStatusL2 == null && data?.queryStatusL1 === 'Open'),
-      );
-      setEscalateButtonEnabled(
-        (data?.queryStatusL1 === 'Open' &&
-          !data?.queryStatusL2 &&
-          daysDifference >= 4) ||
-          data?.queryStatusL2 === 'Open',
-      );
+  const getStatusStyle = () => {
+    switch (getStatusText().toLowerCase()) {
+      case "open":
+      case "in progress":
+        return { backgroundColor: "#D1FAE5", color: "#047857" };
+      case "closed":
+      case "completed":
+        return { backgroundColor: "#F3F4F6", color: "#6B7280" };
+      case "pending":
+        return { backgroundColor: "#FEF3C7", color: "#B45309" };
+      default:
+        return { backgroundColor: "#F3F4F6", color: "#6B7280" };
     }
-  }, [data]);
-
-  const getStatusText = () => {
-    if (data?.queryStatusL2 !== null) {
-      return data.queryStatusL2;
-    } else if (data?.queryStatusL1 !== null) {
-      return data.queryStatusL1;
-    }
-    return 'No status available';
   };
 
-  // Status component to replace the missing CommonStatusCard
-  const StatusCard = ({status}) => {
-    const normalizedStatus = String(status).toLowerCase();
-    const getStatusStyle = () => {
-      switch (normalizedStatus?.toLowerCase()) {
-        case 'open':
-          return {
-            backgroundColor: '#e8f5e8',
-            color: '#2e7d32',
-            borderColor: '#4caf50',
-          };
-        case 'closed':
-          return {
-            backgroundColor: '#ffebee',
-            color: '#c62828',
-            borderColor: '#f44336',
-          };
-        case 'pending':
-          return {
-            backgroundColor: '#fff3e0',
-            color: '#ef6c00',
-            borderColor: '#ff9800',
-          };
-        default:
-          return {
-            backgroundColor: '#f5f5f5',
-            color: '#757575',
-            borderColor: '#bdbdbd',
-          };
-      }
-    };
+  const formattedRaiseDate = data?.queryRaisedTime
+    ? moment(data.queryRaisedTime).format("DD MMM, YYYY")
+    : "N/A";
 
-    const statusStyle = getStatusStyle();
+  const statusStyle = getStatusStyle();
 
-    return (
-      <View
-        style={[
-          styles.statusCard,
-          {
-            backgroundColor: statusStyle.backgroundColor,
-            borderColor: statusStyle.borderColor,
-          },
-        ]}>
-        <Text
-          style={[
-            styles.statusText,
-            {color: statusStyle.color},
-          ]}>
-          {status}
-        </Text>
-      </View>
+  const handleEscalate = () => {
+    setEl2ModalMessage(
+      `Request ${data?.queryId || data?.id} has been escalated to Level 2 successfully.`
     );
+    setEl2ModalVisible(true);
   };
 
-  if (!data) {
+  if (!data?.queryId && !data?.id) {
     return (
-      <View style={styles.container}>
-        <Header title="Query Details" />
+      <Container>
         <View style={styles.centeredContent}>
-          <Text>Query not found</Text>
+          <Icon name="alert-circle-outline" size={80} color="#DC2626" />
+          <Text style={styles.noRecordText}>Request not found</Text>
         </View>
-      </View>
+      </Container>
     );
   }
 
-  const formattedQueryRaiseDate = moment(data?.queryRaisedTime).format(
-    'DD MMMM YYYY',
-  );
-
-  const formattedQueryEndDate = data?.queryStatusTimeL2 
-    ? moment(data?.queryStatusTimeL2).format('DD MMMM YYYY')
-    : '';
-
-  const closeQuaryButton = () => {
-    dispatch(closeQuery({ queryId: data.queryId }));
-    setModalMessage(
-      `Your query ${data?.queryId} has been closed successfully! \n Your feedback is valuable to us! Share your thoughts now and help us improve.`,
-    );
-    setModalVisible(true);
-  };
-
-  const escalationLevel = () => {
-    dispatch(escalateToLevel2({ queryId: data.queryId }));
-    setEl2modalMessage(
-      `Query ${data?.queryId} Submitted Successfully to L2. \n Close your query when resolved.`,
-    );
-    setEl2modalVisible(true);
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    navigation.navigate('BottomFotter', {screen: 'Menu'});
-  };
-
-  const e2closeModal = () => {
-    setEl2modalVisible(false);
-    navigation.navigate('BottomFotter', {screen: 'Menu'});
-  };
-
   return (
-    <KeyboardAvoidingView
-      style={styles.container2}
-      behavior={Platform.OS === 'ios' ? 'padding' : ''}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 100}
-    >
-        <CollectionNavBar />
-      <View style={styles.container}>
-        <Header title="Query Details" />
-        <View style={styles.detailsContainer}>
-          <View style={styles.textContainer}>
-            <Text style={styles.leftText}>{data?.queryId}</Text>
-          </View>
-          <View style={styles.rightTextContainer}>
-            <StatusCard status={getStatusText()} />
-          </View>
+    <Container>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        {/* 🔹 Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <AppIcon name={icons.arrowBack} size={22} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Request Details</Text>
         </View>
-        <View style={[styles.levelContainer, {marginLeft: 20}]}>
-          <AppIcon name={icons.tick} size={wp('6%')} />
-          {data?.queryStatusL2 && <View style={styles.horizontalLine} />}
-          {data?.queryStatusL2 && <AppIcon name={icons.tick} size={wp('6%')} />}
-        </View>
-        <View style={[styles.levelContainer, {marginLeft: 20, marginTop: 5}]}>
-          <View>
-            <Text style={styles.levelText}>Level 1</Text>
-            <Text style={styles.dateText}>{formattedQueryRaiseDate}</Text>
-          </View>
-          {data?.queryStatusL2 && (
-            <View style={{marginLeft: '28%'}}>
-              <Text style={styles.levelText}>Level 2</Text>
-              <Text style={styles.dateText}>{formattedQueryEndDate}</Text>
+
+        {/* 🔸 Card */}
+        <View style={styles.card}>
+          <View style={styles.cardTopRow}>
+            <Text style={styles.reqId}>{data?.queryId || data?.id}</Text>
+            <View
+              style={[
+                styles.statusTag,
+                { backgroundColor: statusStyle.backgroundColor },
+              ]}
+            >
+              <Text style={[styles.statusText, { color: statusStyle.color }]}>
+                {getStatusText()}
+              </Text>
             </View>
-          )}
-        </View>
-
-        <View style={styles.separator} />
-
-        <View style={styles.queryDetailsContainer}>
-          <View style={styles.queryDetailRow}>
-            <Text style={styles.queryDetailText}>Type of Query </Text>
-            <Text style={styles.queryDetailData}>{data?.queryType}</Text>
           </View>
-          <View style={styles.queryDetailRow}>
-            <Text style={styles.queryDetailText}>Query Subject</Text>
-            <Text style={styles.queryDetailData}>{data?.querySubject}</Text>
-          </View>
-          <View style={styles.queryDetailRow}>
-            <Text style={styles.queryDetailText}>Query</Text>
-            <Text style={styles.queryDetailData}>{data?.queryDescription}</Text>
-          </View>
-        </View>
 
-        <View style={styles.buttonContainer}>
-          {data?.queryStatusL2 == 'Open' ||
-          (data?.queryStatusL2 == null && data?.queryStatusL1 == 'Open') ? (
-            <View style={{marginBottom: 10}}>
-              {closeButtonEnabled && (
-                <CustomButton
-                  style={{borderRadius: 50}}
-                  title={'Close'}
-                  size={18}
-                  action={closeQuaryButton}
-                  align={'center'}
-                  loading={false}
-                />
-              )}
+          <View style={styles.levelDateRow}>
+            <View style={styles.levelTag}>
+              <Text style={styles.levelText}>Level 1</Text>
             </View>
-          ) : null}
-          {data?.queryStatusL2 !== null
-            ? null
-            : data?.queryStatusL1 !== 'Closed' &&
-              data?.queryStatusL2 !== 'Closed' && (
-                <CustomButton
-                  style={[styles.button, styles.buttonGap]}
-                  title="Escalate to Level 2"
-                  size={18}
-                  action={escalationLevel}
-                  disabled={!escalateButtonEnabled}
-                  color={!escalateButtonEnabled ? '#7B8A85' : Colors.primary}
-                  textColor={!escalateButtonEnabled ? '#a1a1a1' : Colors.white}
-                  align="center"
-                  loading={false}
-                />
-              )}
+            <Text style={styles.dateText}>Created on: {formattedRaiseDate}</Text>
+          </View>
+
+          <View style={styles.infoBlock}>
+            <Text style={styles.label}>Query Type</Text>
+            <Text style={styles.value}>{data?.queryType || "-"}</Text>
+
+            <Text style={[styles.label, { marginTop: 12 }]}>Query Subject</Text>
+            <Text style={styles.value}>
+              {data?.querySubject || data?.title}
+            </Text>
+
+            <Text style={[styles.label, { marginTop: 12 }]}>Query Details</Text>
+            <Text style={styles.value}>
+              {data?.queryDescription || data?.description}
+            </Text>
+          </View>
         </View>
 
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-        >
+      
+{/* 🔺 Escalate Button (Natural Bottom Position) */}
+<View style={styles.bottomButtonWrapper}>
+  <TouchableOpacity
+    style={[
+      styles.escalateButton,
+      !escalateButtonEnabled && { opacity: 0.6 },
+    ]}
+    disabled={!escalateButtonEnabled}
+    onPress={handleEscalate}
+  >
+    <Text style={styles.escalateText}>Escalate to Level 2</Text>
+  </TouchableOpacity>
+</View>
+
+
+
+        {/* 🟢 Modal */}
+        <Modal transparent visible={el2ModalVisible} animationType="fade">
           <TouchableOpacity
-            style={styles.centeredView}
+            style={styles.modalOverlay}
             activeOpacity={1}
-            onPressOut={() => setModalVisible(false)}>
+            onPressOut={() => setEl2ModalVisible(false)}
+          >
             <TouchableWithoutFeedback>
-              <View style={styles.modalView}>
-                <Text style={styles.modalText}>{modalMessage}</Text>
+              <View style={styles.modalBox}>
+                <Icon name="arrow-up-circle" size={60} color="#DC2626" />
+                <Text style={styles.modalTitle}>Escalated!</Text>
+                <Text style={styles.modalText}>{el2ModalMessage}</Text>
                 <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={closeModal}>
-                  <Text style={styles.closeButtonText}>OK</Text>
+                  style={styles.modalButton}
+                  onPress={() => {
+                    setEl2ModalVisible(false);
+                    navigation.goBack();
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
           </TouchableOpacity>
         </Modal>
-
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={el2modalVisible}
-          onRequestClose={e2closeModal}>
-          <TouchableOpacity
-            style={styles.centeredView}
-            activeOpacity={1}
-            onPressOut={() => setEl2modalVisible(false)}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalView}>
-                <Text style={styles.modalText}>{el2modalMessage}</Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={e2closeModal}>
-                  <Text style={styles.closeButtonText}>OK</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </TouchableOpacity>
-        </Modal>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </Container>
   );
 }
 
-// Same styles as before...
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'white' },
-  detailsContainer: { flexDirection: 'row', justifyContent: 'space-between', padding: 20 },
-  textContainer: { flexDirection: 'row', alignItems: 'center' },
-  leftText: { fontSize: wp('5%'), fontFamily: getFontFamily('bold'), color: '#174035' },
-  rightTextContainer: {},
-  statusCard: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: wp(5),
+    marginTop: hp(1),
+  },
+  headerTitle: {
+    fontSize: wp(4.5),
+    fontWeight: "700",
+    color: "#111827",
+    marginLeft: wp(2),
+  },
+  card: {
+    backgroundColor: "#fff",
+    marginHorizontal: wp(5),
+    marginTop: hp(2),
     borderRadius: 16,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
+    padding: wp(4.5),
+    shadowColor: "#E53935",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cardTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  reqId: {
+    fontSize: wp(4),
+    fontWeight: "700",
+    color: "#111827",
+  },
+  statusTag: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   statusText: {
-    fontSize: wp('3.5%'),
-    fontFamily: getFontFamily('medium'),
-    textTransform: 'uppercase',
+    fontSize: wp(3.2),
+    fontWeight: "600",
   },
-  levelContainer: { flexDirection: 'row' },
-  levelText: { fontSize: wp('4%'), fontFamily: getFontFamily('bold'), color: Colors.primary },
-  dateText: { fontSize: wp('4'), fontFamily: getFontFamily('bold'), color: '#7B8A85' },
-  separator: { height: 1, backgroundColor: '#CCC', marginVertical: 30, marginHorizontal: 10 },
-  horizontalLine: { height: 2, width: wp('50%'), backgroundColor: Colors.primary, marginTop: wp(3) },
-  queryDetailsContainer: { paddingHorizontal: 20, paddingVertical: 10 },
-  queryDetailRow: { marginBottom: 25 },
-  queryDetailText: { fontSize: wp('4'), fontFamily: getFontFamily('regular'), color: '#b8b8b8' },
-  queryDetailData: { fontSize: wp('4'), fontFamily: getFontFamily('regular'), color: '#174035' },
-  buttonContainer: { flexDirection: 'column', justifyContent: 'space-around', padding: 20, position: 'absolute', bottom: 10, width: '100%' },
-  button: { backgroundColor: '#174035', width: '100%', justifyContent: 'center', alignItems: 'center', borderRadius: 30, marginTop: 30, height: 60 },
-  buttonGap: { marginTop: 20 },
-  centeredView: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalView: { backgroundColor: 'white', borderRadius: 15, padding: 20, alignItems: 'center', shadowColor: '#000', height: hp(30), width: wp(80), shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
-  modalText: { marginBottom: 20, textAlign: 'center', fontSize: 18, fontFamily: getFontFamily('medium') , color: Colors.black,
+  levelDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: hp(1),
+    justifyContent: "space-between",
+  },
+  levelTag: {
+    backgroundColor: "#E9EBFF",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  levelText: { fontSize: wp(3.2), color: "#1D4ED8", fontWeight: "600" },
+  dateText: { fontSize: wp(3.2), color: "#6B7280" },
+  infoBlock: { marginTop: hp(2) },
+  label: { fontSize: wp(3), color: "#9CA3AF" },
+  value: { fontSize: wp(3.5), color: "#111827", marginTop: 2, lineHeight: 20 },
+
+bottomButtonWrapper: {
+  marginTop: hp(35), // push down naturally to bottom of content
+  marginBottom: hp(3),
+  paddingHorizontal: wp(5),
 },
-  closeButton: { marginTop: 10, borderRadius: 20, paddingVertical: 15, paddingHorizontal: 50, backgroundColor: Colors.primary, position: 'absolute', bottom: 30 },
-  closeButtonText: { color: 'white', fontFamily: getFontFamily('medium'), fontSize: 16 },
-  container2: { flex: 1, backgroundColor: Colors.black, paddingTop: Platform.OS === 'android' ? 0 : StatusBar.currentHeight, ...Platform.select({ ios: { paddingTop: hp(7) } }) },
+
+escalateButton: {
+  backgroundColor: "#E53935",
+  borderRadius: 10,
+  height: 56,
+  justifyContent: "center",
+  alignItems: "center",
+  shadowColor: "#E53935",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.2,
+  shadowRadius: 6,
+  elevation: 5,
+},
+  escalateText: {
+    color: "#FFF",
+    fontWeight: "700",
+    fontSize: wp(4),
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    backgroundColor: "#FFF",
+    borderRadius: 18,
+    padding: 25,
+    alignItems: "center",
+    width: wp(80),
+  },
+  modalTitle: { fontSize: wp(5), fontWeight: "700", marginTop: 10 },
+  modalText: {
+    textAlign: "center",
+    color: "#6B7280",
+    fontSize: wp(3.6),
+    marginVertical: 10,
+  },
+  modalButton: {
+    backgroundColor: "#E53935",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+  },
+  modalButtonText: { color: "#FFF", fontWeight: "600" },
+  centeredContent: { flex: 1, alignItems: "center", justifyContent: "center" },
+  noRecordText: { marginTop: 10, color: "#6B7280", fontSize: wp(4) },
 });
