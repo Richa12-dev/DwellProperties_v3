@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState}  from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { loginDataSelectors } from '../../Redux/Login/loginSlice';
 import { Colors } from '../../Theme';
 import CollectionNavBar from '../../components/CollectionNavBar/CollectionNavBar';
@@ -19,10 +19,16 @@ import {
   widthPercentageToDP as wp,
 } from 'react-native-responsive-screen';
 import Container from '../../components/Container/Container';
+import {logout} from '../../Redux/Login/services';
+import {useNavigation} from '@react-navigation/native';
+import Dialog from 'react-native-dialog';
 
 const ProfileHome = ({ navigation }) => {
-  const loginData =
-    useSelector(state => loginDataSelectors.getLoginStatus(state)) || {};
+  const dispatch = useDispatch();
+  const {token} = useSelector(loginDataSelectors.getData);
+  const [showDialog, setShowDialog] = useState(false);
+  const loginData = useSelector(loginDataSelectors.getLoginStatus);
+
   const { userData = null, isLogged = false } = loginData;
 
   const backButton = () => {
@@ -44,6 +50,17 @@ const userId = userData?.landlordId || userData?.tenantId || userData?.contracto
 const fullName = userData?.firstName && userData?.lastName
      ? `${userData.firstName} ${userData.lastName}`
      : userData?.name || 'N/A';
+     
+     
+       const handleLogout = async () => {
+    try {
+      setShowDialog(false);
+      await dispatch(logout({token})).unwrap();
+      console.log('Logout successful');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   return (
      <Container>
@@ -83,7 +100,8 @@ const fullName = userData?.firstName && userData?.lastName
         </View>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton}>
+        <TouchableOpacity style={styles.logoutButton}
+                    onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
 </Container>

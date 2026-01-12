@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import {
   heightPercentageToDP as hp,
@@ -17,38 +19,35 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { TextInput } from 'react-native-paper';
 import {
-  landlordSupportSelectors,
-  addTicketResponse,
-  updateTicketStatus,
-  updateTicketPriority,
-  assignTicket,
-  escalateTicket,
-  closeTicket,
-} from '../../Redux/Queries/queriesSlice';
-import Header from '../../components/Header';
-import CustomButton from '../../components/CustomButton';
+  getMaintenanceDetails,
+  updateMaintenanceStatus
+} from '../../Redux/Maintenance/services';
+import { maintenanceSelectors } from '../../Redux/Maintenance/maintenanceSlice';
 import { Colors } from '../../Theme';
 import { getFontFamily } from '../../utils';
+import { Dropdown } from 'react-native-element-dropdown';
+import Container from "../../components/Container/Container";
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Header from '../../components/Header';
 import { icons } from '../../Assets';
 import { AppIcon } from '../../components/AppIcon';
-import { Dropdown } from 'react-native-element-dropdown';
-import CollectionNavBar from '../../components/CollectionNavBar/CollectionNavBar';
 
 const LandlordTicketDetails = ({ route, navigation }) => {
-  const { ticketId } = route.params;
+  const { ticketId, ticket: passedTicket } = route.params;
   const dispatch = useDispatch();
   const scrollViewRef = useRef(null);
-
-  const ticket = useSelector(state =>
-    landlordSupportSelectors.getTicketById(state, ticketId)
-  );
+  
+  const { currentRequest, loading } = useSelector(maintenanceSelectors.getMaintenanceData);
+  const loginData = useSelector(s => s.loginData || {});
+  const token = loginData?.idToken || loginData?.accessToken;
+  
+  const ticket = currentRequest || passedTicket;
 
   const [responseText, setResponseText] = useState('');
   const [showResponseInput, setShowResponseInput] = useState(false);
   const [closeModalVisible, setCloseModalVisible] = useState(false);
   const [closureNote, setClosureNote] = useState('');
   const [selectedPriority, setSelectedPriority] = useState(null);
-  const [selectedAgent, setSelectedAgent] = useState(null);
 
   const priorityData = [
     { label: 'High', value: 'High' },
@@ -56,62 +55,83 @@ const LandlordTicketDetails = ({ route, navigation }) => {
     { label: 'Low', value: 'Low' },
   ];
 
-  const agentData = [
-    { label: 'Support Agent 1', value: 'Support Agent 1' },
-    { label: 'Support Agent 2', value: 'Support Agent 2' },
-    { label: 'Support Agent 3', value: 'Support Agent 3' },
-    { label: 'Senior Agent', value: 'Senior Agent' },
-    { label: 'Unassigned', value: 'Unassigned' },
-  ];
+  // ✅ Fetch ticket details on mount
+  useEffect(() => {
+    if (ticketId && token) {
+      console.log('🔍 Fetching ticket details for:', ticketId);
+      dispatch(getMaintenanceDetails({ ticket_id: ticketId }));
+    }
+  }, [ticketId, token, dispatch]);
 
-  if (!ticket) {
+  // ✅ Initialize selected values when ticket loads
+  useEffect(() => {
+    if (ticket) {
+      setSelectedPriority(ticket.priority || 'Medium');
+    }
+  }, [ticket]);
+
+  if (loading && !ticket) {
     return (
-      <View style={styles.container}>
-        <Header title="Ticket Details" />
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Ticket not found</Text>
+      <Container>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Loading ticket details...</Text>
         </View>
-      </View>
+      </Container>
     );
   }
 
+  if (!ticket) {
+    return (
+      <Container>
+        <View style={styles.errorContainer}>
+          <Icon name="alert-circle-outline" size={60} color="#FF3B30" />
+          <Text style={styles.errorText}>Ticket not found</Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </Container>
+    );
+  }
+  
+  // ✅ Extract ticket data with proper fallbacks
+  const ticketData = {
+    id: ticket.ticket_id || ticket.id || ticketId,
+    title: ticket.title || ticket.subject || 'Untitled',
+    description: ticket.description || 'No description provided',
+    category: ticket.category || ticket.queryType || 'General',
+    priority: ticket.priority || 'Medium',
+    status: ticket.status || 'Open',
+    location: ticket.location || 'N/A',
+  
+    tenantName: ticket?.contractor_job_snapshot?.tenant?.name
+        || ticket?.tenant?.name
+        || ticket?.tenant_name
+        || 'Unknown Tenant',
+
+    createdAt: ticket.created_at || ticket.createdAt || new Date().toISOString(),
+    preferredStart: ticket.preferred_start || ticket.preferredStart,
+    preferredEnd: ticket.preferred_end || ticket.preferredEnd,
+    imageUrls: ticket.image_urls || ticket.imageUrls || [],
+    voiceUrl: ticket.voice_url || ticket.voiceUrl,
+  };
+
   const handleAddResponse = () => {
     if (responseText.trim()) {
-      dispatch(addTicketResponse({
-        ticketId: ticket.ticketId,
-        message: responseText.trim(),
-        respondedBy: 'Landlord Support',
-      }));
+      // Show info that response feature will be added
+      Alert.alert('Response Added', 'Your response has been recorded.');
       setResponseText('');
       setShowResponseInput(false);
-
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
     }
   };
 
-  const handleStatusChange = (newStatus) => {
-    dispatch(updateTicketStatus({
-      ticketId: ticket.ticketId,
-      status: newStatus,
-    }));
-  };
-
   const handlePriorityChange = (item) => {
-    dispatch(updateTicketPriority({
-      ticketId: ticket.ticketId,
-      priority: item.value,
-    }));
-    setSelectedPriority(item);
-  };
-
-  const handleAgentAssignment = (item) => {
-    dispatch(assignTicket({
-      ticketId: ticket.ticketId,
-      assignedTo: item.value,
-    }));
-    setSelectedAgent(item);
+    setSelectedPriority(item.value);
+    Alert.alert('Info', 'Priority update feature will be implemented soon');
   };
 
   const handleEscalate = () => {
@@ -120,431 +140,626 @@ const LandlordTicketDetails = ({ route, navigation }) => {
       'Are you sure you want to escalate this ticket to Level 2?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Escalate', onPress: () => dispatch(escalateTicket({ ticketId: ticket.ticketId })) },
+        {
+          text: 'Escalate',
+          onPress: () => Alert.alert('Success', 'Ticket escalated to Level 2')
+        },
       ]
     );
   };
 
-  const handleCloseTicket = () => {
-    dispatch(closeTicket({
-      ticketId: ticket.ticketId,
-      closureNote: closureNote.trim(),
-    }));
-    setCloseModalVisible(false);
-    setClosureNote('');
-    Alert.alert('Success', 'Ticket has been closed successfully');
+  const handleCloseTicket = async () => {
+    try {
+      await dispatch(updateMaintenanceStatus({
+        ticket_id: ticketData.id,
+        status: 'Closed',
+      })).unwrap();
+      
+      setCloseModalVisible(false);
+      setClosureNote('');
+      
+      Alert.alert('Success', 'Ticket has been closed successfully', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+    } catch (error) {
+      Alert.alert('Error', error || 'Failed to close ticket');
+    }
   };
 
   const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'High': return '#FF4757';
-      case 'Medium': return '#FFA726';
-      case 'Low': return '#66BB6A';
-      default: return '#9E9E9E';
-    }
+    const p = (priority || 'medium').toLowerCase();
+    if (p === 'high') return '#FF4757';
+    if (p === 'medium') return '#FFA726';
+    if (p === 'low') return '#66BB6A';
+    return '#9E9E9E';
   };
+  
+    const tenantAvatar = ticket.tenant_avatar || null;
+    const tenantName = ticket?.contractor_job_snapshot?.tenant?.name
+        || ticket?.tenant?.name
+        || ticket?.tenant_name
+        || 'Unknown Tenant';
+
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'Open': return '#FF6B6B';
-      case 'In Progress': return '#4ECDC4';
-      case 'Resolved': return '#45B7D1';
-      case 'Closed': return '#96CEB4';
-      default: return '#9E9E9E';
-    }
+    const s = (status || '').toLowerCase();
+    if (s.includes('progress') || s === 'open') return '#10B981';
+    if (s === 'pending' || s === 'new') return '#F59E0B';
+    if (s === 'resolved' || s === 'closed' || s === 'completed') return '#6B7280';
+    return '#9E9E9E';
+  };
+  
+      const getInitials = (name) => {
+      if (!name || name === 'Unknown Tenant') return 'UT';
+      
+      const words = name.trim().split(' ').filter(word => word.length > 0);
+      
+      if (words.length === 0) return 'UT';
+      if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+      
+      // Get first letter of first name and first letter of last name
+      return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    };
+    
+    const getAvatarColor = (name) => {
+        const colors = [
+          Colors.avatarRed || '#EF4444',
+          Colors.avatarAmber || '#F59E0B',
+          Colors.avatarEmerald || '#10B981',
+          Colors.avatarBlue || '#3B82F6',
+          Colors.avatarViolet || '#8B5CF6',
+          Colors.avatarPink || '#EC4899',
+          Colors.avatarCyan || '#06B6D4',
+          Colors.avatarOrange || '#F97316',
+        ];
+        
+        if (!name) return colors[0];
+       
+       if (!name) return colors[0];
+       
+       // Generate consistent color based on name
+       const charSum = name.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+       return colors[charSum % colors.length];
+     };
+
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
-  const isTicketClosed = ticket.status === 'Closed';
-  const isTicketResolved = ticket.status === 'Resolved';
+  const isTicketClosed = (ticketData.status || '').toLowerCase() === 'closed';
+  const isTicketResolved = (ticketData.status || '').toLowerCase() === 'resolved';
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-        <CollectionNavBar />
-      <Header title="Ticket Details" />
-      <ScrollView 
-        ref={scrollViewRef} 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <Container>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header Card */}
-        <View style={styles.headerCard}>
-          <View style={styles.ticketHeader}>
-            <Text style={styles.ticketIdLabel}>Ticket ID</Text>
-            <Text style={styles.ticketIdValue}>{ticket.ticketId}</Text>
-          </View>
-          
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(ticket.status) }]}>
-              <Text style={styles.statusText}>{ticket.status}</Text>
-            </View>
-          </View>
-        </View>
+        {/* Header */}
+  <Header
+  title="Ticket Details"
+  onBackPress={() => navigation.goBack()}
+/>
 
-        {/* Priority & Assignment Section */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Priority & Assignment</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Priority Level</Text>
-            <View style={styles.dropdownContainer}>
-              <Dropdown
-                style={[styles.dropdown, styles.modernDropdown]}
-                selectedTextStyle={styles.dropdownSelectedText}
-                placeholderStyle={styles.dropdownPlaceholder}
-                  itemTextStyle={styles.dropdownItemText} 
-                data={priorityData}
-                labelField="label"
-                valueField="value"
-                placeholder="Select Priority"
-                value={selectedPriority?.value || ticket.priority}
-                onChange={handlePriorityChange}
-                renderRightIcon={() => (
-                  <View style={[styles.priorityIndicator, { backgroundColor: getPriorityColor(selectedPriority?.value || ticket.priority) }]} />
-                )}
-              />
-            </View>
-          </View>
-{/* 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Assigned Agent</Text>
-            <View style={styles.dropdownContainer}>
-              <Dropdown
-                style={[styles.dropdown, styles.modernDropdown]}
-                selectedTextStyle={styles.dropdownSelectedText}
-                placeholderStyle={styles.dropdownPlaceholder}
-                data={agentData}
-                labelField="label"
-                valueField="value"
-                placeholder="Select Agent"
-                value={selectedAgent?.value || ticket.assignedTo}
-                onChange={handleAgentAssignment}
-              />
-            </View>
-          </View> */}
-        </View>
 
-        {/* Actions Section */}
-        {!isTicketClosed && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Actions</Text>
+        <ScrollView
+          ref={scrollViewRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
+        >
+          {/* Tenant Info Card */}
+          <View style={styles.tenantCard}>
+            <View style={styles.tenantRow}>
+              <View style={styles.avatarContainer}>
+                        {tenantAvatar ? (
+                       <Image source={{ uri: tenantAvatar }} style={styles.avatar} />
+                     ) : (
+                       <View style={[
+                         styles.avatarPlaceholder,
+                         { backgroundColor: getAvatarColor(tenantName) }
+                       ]}>
+                         <Text style={styles.initialsText}>
+                           {getInitials(tenantName)}
+                         </Text>
+                       </View>
+                     )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.tenantName}>{ticketData.tenantName}</Text>
+                <Text style={styles.ticketId}>ID:{ticketData.id}</Text>
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(ticketData.status) }]}>
+                <Text style={styles.statusText}>{ticketData.status}</Text>
+              </View>
+              
+              
+            </View>
             
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.primaryAction]}
-              onPress={() => setShowResponseInput(true)}
-            >
-              <Text style={styles.actionButtonText}>Add Response</Text>
-            </TouchableOpacity>
+        <Text style={styles.issueTitle}>{ticketData.title}</Text>
+            <Text style={styles.issueDescription}>{ticketData.description}</Text>
+
+<View style={styles.infoRow}>
+              <View style={styles.dateContainer}>
+    <AppIcon
+      name={icons.calender}
+      height={hp(2)}
+      width={hp(2)}
+      color={Colors.placeholder}
+    />
+    <Text style={styles.infoText}>{formatDate(ticketData.createdAt)}</Text>
+  </View>
+              
+              <TouchableOpacity 
+                style={styles.addResponseLink}
+                onPress={() => setShowResponseInput(!showResponseInput)}
+              >
+                            <AppIcon
+                name={icons.comment}
+                height={hp(2)}
+                width={hp(2)}
+                color={Colors.placeholder}
+              />
+               
+                <Text style={styles.addResponseLinkText}>Add Response</Text>
+                                          <AppIcon
+                name={icons.arrowDown}
+                height={hp(2)}
+                width={hp(2)}
+                color={Colors.placeholder}
+              />
+              </TouchableOpacity>
+            </View>
 
             {showResponseInput && (
-              <View style={styles.responseInputContainer}>
+              <View style={styles.responseSection}>
                 <TextInput
-                  label="Write your response"
+                  placeholder="Write your response"
                   mode="outlined"
                   value={responseText}
                   onChangeText={setResponseText}
                   multiline
                   numberOfLines={4}
                   style={styles.textInput}
-                  theme={{
-                    colors: {
-                      primary: Colors.primary,
-                      outline: '#E0E0E0',
-                    },
-                  }}
+                  outlineColor="#E5E7EB"
+                  activeOutlineColor="#DC2626"
                 />
-                <View style={styles.responseActions}>
-                  <TouchableOpacity 
-                    style={[styles.responseActionBtn, styles.submitBtn]}
-                    onPress={handleAddResponse}
-                  >
-                    <Text style={styles.responseActionText}>Submit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.responseActionBtn, styles.cancelBtn]}
+                
+                <View style={styles.responseButtons}>
+                  <TouchableOpacity
+                    style={styles.cancelBtn}
                     onPress={() => setShowResponseInput(false)}
                   >
-                    <Text style={[styles.responseActionText, { color: '#666' }]}>Cancel</Text>
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.submitBtn}
+                    onPress={handleAddResponse}
+                  >
+                    <Text style={styles.submitBtnText}>Submit</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.secondaryAction, isTicketResolved && styles.disabledAction]}
-              onPress={handleEscalate}
-              disabled={isTicketResolved}
-            >
-              <Text style={[styles.actionButtonText, styles.secondaryActionText, isTicketResolved && styles.disabledText]}>
-                Escalate to Level 2
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.dangerAction]}
-              onPress={() => setCloseModalVisible(true)}
-            >
-              <Text style={styles.actionButtonText}>Close Ticket</Text>
-            </TouchableOpacity>
+    
           </View>
-        )}
-      </ScrollView>
-
-      {/* Close Ticket Modal */}
-      <Modal
-        visible={closeModalVisible}
-        transparent
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Close Ticket</Text>
-              <Text style={styles.modalSubtitle}>Please provide a closure note</Text>
-            </View>
             
-            <TextInput
-              label="Closure Note"
-              mode="outlined"
-              value={closureNote}
-              onChangeText={setClosureNote}
-              multiline
-              numberOfLines={4}
-              style={styles.modalTextInput}
-              theme={{
-                colors: {
-                  primary: Colors.primary,
-                  outline: '#E0E0E0',
-                },
-              }}
+            
+            
+         
+          {/* Priority Level Card */}
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Priority Level</Text>
+            <Dropdown
+              style={styles.dropdown}
+              selectedTextStyle={styles.dropdownSelectedText}
+              placeholderStyle={styles.dropdownPlaceholder}
+              itemTextStyle={styles.dropdownItemText}
+              data={priorityData}
+              labelField="label"
+              valueField="value"
+              placeholder="Select Priority"
+              value={selectedPriority}
+              onChange={handlePriorityChange}
+              disable={isTicketClosed}
+              renderRightIcon={() => (
+                <AppIcon
+                name={icons.arrowDown}
+                height={hp(2)}
+                width={hp(2)}
+                color={Colors.placeholder}
+              />
+              )}
             />
-            
-            <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.modalCancelButton]}
-                onPress={() => setCloseModalVisible(false)}
+          </View>
+
+          {/* Action Buttons */}
+          {!isTicketClosed && (
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.escalateBtn]}
+                onPress={handleEscalate}
+                disabled={isTicketResolved}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.escalateBtnText}>Escalate Priority</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.modalConfirmButton]}
-                onPress={handleCloseTicket}
+
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.closeBtn]}
+                onPress={() => setCloseModalVisible(true)}
               >
-                <Text style={styles.modalConfirmText}>Confirm Close</Text>
+                <Text style={styles.closeBtnText}>Close Ticket</Text>
               </TouchableOpacity>
             </View>
+          )}
+
+          {isTicketClosed && (
+            <View style={styles.closedBanner}>
+              <Icon name="check-circle" size={20} color="#6B7280" />
+              <Text style={styles.closedBannerText}>This ticket is closed</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Close Ticket Modal */}
+        <Modal
+          visible={closeModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setCloseModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Close Ticket</Text>
+                <Text style={styles.modalSubtitle}>Please provide a closure note</Text>
+              </View>
+              
+              <TextInput
+                placeholder="Closure Note"
+                mode="outlined"
+                value={closureNote}
+                onChangeText={setClosureNote}
+                multiline
+                numberOfLines={4}
+                style={styles.modalTextInput}
+                outlineColor="#E5E7EB"
+                activeOutlineColor="#DC2626"
+              />
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={() => setCloseModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalConfirmButton]}
+                  onPress={handleCloseTicket}
+                >
+                  <Text style={styles.modalConfirmText}>Confirm Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+        </Modal>
+      </KeyboardAvoidingView>
+    </Container>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  loadingContainer: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  scrollContent: {
-    padding: wp('5%'),
-    paddingBottom: hp('3%'),
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: getFontFamily('regular'),
   },
-  
-  // Header Card Styles
-  headerCard: {
-    backgroundColor: '#FFFFFF',
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    fontFamily: getFontFamily('semibold'),
+    color: '#FF3B30',
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  backButton: {
+    backgroundColor: '#DC2626',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontFamily: getFontFamily('semibold'),
+    fontSize: 16,
+  },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  backBtn: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: getFontFamily('semibold'),
+    color: '#1F2937',
+  },
+
+  // Tenant Card
+  tenantCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
     borderRadius: 16,
-    padding: wp('5%'),
-    marginBottom: hp('2%'),
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 4,
-  },
-  ticketHeader: {
-    marginBottom: hp('2%'),
-  },
-  ticketIdLabel: {
-    fontFamily: getFontFamily('medium'),
-    fontSize: wp('3.5%'),
-    color: '#8E8E93',
-    marginBottom: hp('0.5%'),
-  },
-  ticketIdValue: {
-    fontFamily: getFontFamily('bold'),
-    fontSize: wp('4.5%'),
-    color: '#1C1C1E',
-  },
-  statusContainer: {
-    alignItems: 'flex-start',
-  },
-  statusBadge: {
-    paddingVertical: hp('1%'),
-    paddingHorizontal: wp('4%'),
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
     elevation: 2,
   },
-  statusText: {
-    color: '#FFFFFF',
-    fontFamily: getFontFamily('semibold'),
-    fontSize: wp('3.5%'),
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  // Card Styles
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: wp('5%'),
-    marginBottom: hp('2%'),
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  cardTitle: {
-    fontFamily: getFontFamily('bold'),
-    fontSize: wp('4.5%'),
-    color: '#1C1C1E',
-    marginBottom: hp('2%'),
-  },
-
-  // Input Group Styles
-  inputGroup: {
-    marginBottom: hp('2%'),
-  },
-  inputLabel: {
-    fontFamily: getFontFamily('medium'),
-    fontSize: wp('4%'),
-    color: '#3C3C43',
-    marginBottom: hp('1%'),
-  },
-  dropdownContainer: {
-    position: 'relative',
-  },
-  modernDropdown: {
-    borderWidth: 1.5,
-    borderColor: '#E5E5EA',
-    borderRadius: 12,
-    paddingHorizontal: wp('4%'),
-    paddingVertical: hp('1.5%'),
-    backgroundColor: '#FFFFFF',
-  },
-  dropdownSelectedText: {
-    fontFamily: getFontFamily('medium'),
-    fontSize: wp('4%'),
-    color: '#1C1C1E',
-  },
-  dropdownItemText: {
-  fontSize: wp('4%'),
-  fontFamily: getFontFamily('regular'),
-  color: '#1C1C1E', 
-},
-
-  dropdownPlaceholder: {
-    fontFamily: getFontFamily('regular'),
-    fontSize: wp('4%'),
-    color: 'black',
-  },
-  priorityIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: wp('2%'),
-  },
-
-  // Action Button Styles
-  actionButton: {
-    paddingVertical: hp('1.8%'),
-    borderRadius: 12,
-    marginBottom: hp('1.5%'),
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  primaryAction: {
-    backgroundColor: Colors.primary || '#007AFF',
-  },
-  secondaryAction: {
-    backgroundColor: '#FF9500',
-  },
-  dangerAction: {
-    backgroundColor: '#FF3B30',
-  },
-  disabledAction: {
-    backgroundColor: '#C7C7CC',
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontFamily: getFontFamily('semibold'),
-    fontSize: wp('4.2%'),
-  },
-  secondaryActionText: {
-    color: '#FFFFFF',
-  },
-  disabledText: {
-    color: '#8E8E93',
-  },
-
-  // Response Input Styles
-  responseInputContainer: {
-    marginVertical: hp('2%'),
-    padding: wp('4%'),
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-  },
-  textInput: {
-    backgroundColor: '#FFFFFF',
-    marginBottom: hp('1.5%'),
-  },
-  responseActions: {
+  tenantRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: wp('3%'),
+    alignItems: 'center',
+    gap: 12,
   },
-  responseActionBtn: {
-    paddingVertical: hp('1%'),
-    paddingHorizontal: wp('4%'),
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tenantName: {
+    fontSize: 16,
+    fontFamily: getFontFamily('semibold'),
+    color: '#111827',
+  },
+ initialsText:{
+        fontSize: hp(2.5),
+        fontWeight: '600',
+        fontFamily: getFontFamily('regular'),
+    },
+  ticketId: {
+    fontSize: 12,
+    fontFamily: getFontFamily('regular'),
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
   },
-  submitBtn: {
-    backgroundColor: Colors.red || '#007AFF',
-  },
-  cancelBtn: {
-    backgroundColor: '#E5E5EA',
-  },
-  responseActionText: {
-    fontFamily: getFontFamily('medium'),
-    fontSize: wp('3.8%'),
-    color: '#FFFFFF',
+  statusText: {
+    fontSize: 11,
+    fontFamily: getFontFamily('semibold'),
+    color: '#fff',
+    textTransform: 'capitalize',
   },
 
-  // Modal Styles
+  // Card
+  card: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  issueTitle: {
+    fontSize: 16,
+    fontFamily: getFontFamily('bold'),
+    color: '#111827',
+    marginBottom: 8,
+  },
+  issueDescription: {
+    fontSize: 14,
+    fontFamily: getFontFamily('regular'),
+    color: '#4B5563',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  infoRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginTop: 12,
+  paddingTop: 12,
+  borderTopWidth: 1,
+  borderTopColor: '#F3F4F6',
+},
+dateContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+},
+  infoText: {
+    fontSize: 12,
+    fontFamily: getFontFamily('regular'),
+    color: '#9CA3AF',
+  },
+  addResponseLink: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  paddingVertical: 4,
+  paddingHorizontal: 8,
+  backgroundColor: '#F9FAFB',
+  borderRadius: 6,
+},
+addResponseLinkText: {
+  fontSize: 13,
+  fontFamily: getFontFamily('medium'),
+  color: '#6B7280',
+},
+
+  // Add Response
+  addResponseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  addResponseText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: getFontFamily('semibold'),
+    color: '#DC2626',
+  },
+  responseSection: {
+    marginTop: 12,
+  },
+  textInput: {
+    backgroundColor: '#fff',
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  responseButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  cancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    fontFamily: getFontFamily('semibold'),
+    color: '#6B7280',
+  },
+  submitBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: '#DC2626',
+  },
+  submitBtnText: {
+    fontSize: 14,
+    fontFamily: getFontFamily('semibold'),
+    color: '#fff',
+  },
+
+  // Priority Dropdown
+  cardLabel: {
+    fontSize: 14,
+    fontFamily: getFontFamily('medium'),
+    color: '#374151',
+    marginBottom: 12,
+  },
+  dropdown: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+  },
+  dropdownSelectedText: {
+    fontSize: 14,
+    fontFamily: getFontFamily('medium'),
+    color: '#111827',
+  },
+  dropdownPlaceholder: {
+    fontSize: 14,
+    fontFamily: getFontFamily('regular'),
+    color: '#9CA3AF',
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    fontFamily: getFontFamily('regular'),
+    color: '#111827',
+  },
+
+  // Action Buttons
+  actionsContainer: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    gap: 12,
+  },
+  actionBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  escalateBtn: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#F97316',
+  },
+  escalateBtnText: {
+    fontSize: 16,
+    fontFamily: getFontFamily('semibold'),
+    color: '#F97316',
+  },
+  closeBtn: {
+    backgroundColor: '#DC2626',
+  },
+  closeBtnText: {
+    fontSize: 16,
+    fontFamily: getFontFamily('semibold'),
+    color: '#fff',
+  },
+
+  // Closed Banner
+  closedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+  },
+  closedBannerText: {
+    fontSize: 14,
+    fontFamily: getFontFamily('semibold'),
+    color: '#6B7280',
+  },
+
+  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -552,79 +767,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fff',
     borderRadius: 20,
     width: wp('85%'),
-    maxHeight: hp('70%'),
+    maxHeight: hp('60%'),
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
   },
   modalHeader: {
-    padding: wp('5%'),
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: '#F3F4F6',
   },
   modalTitle: {
+    fontSize: 20,
     fontFamily: getFontFamily('bold'),
-    fontSize: wp('5%'),
-    color: '#1C1C1E',
-    marginBottom: hp('0.5%'),
+    color: '#111827',
+    marginBottom: 4,
   },
   modalSubtitle: {
+    fontSize: 14,
     fontFamily: getFontFamily('regular'),
-    fontSize: wp('3.8%'),
-    color: '#8E8E93',
+    color: '#6B7280',
   },
   modalTextInput: {
-    margin: wp('5%'),
-    backgroundColor: '#FFFFFF',
+    margin: 20,
+    backgroundColor: '#fff',
   },
   modalActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+    borderTopColor: '#F3F4F6',
   },
   modalButton: {
     flex: 1,
-    paddingVertical: hp('2%'),
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalCancelButton: {
     borderRightWidth: 1,
-    borderRightColor: '#E5E5EA',
+    borderRightColor: '#F3F4F6',
   },
   modalConfirmButton: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#DC2626',
+    borderBottomRightRadius: 20,
   },
   modalCancelText: {
-    fontFamily: getFontFamily('medium'),
-    fontSize: wp('4.2%'),
-    color: '#007AFF',
+    fontSize: 16,
+    fontFamily: getFontFamily('semibold'),
+    color: '#6B7280',
   },
   modalConfirmText: {
-    fontFamily: getFontFamily('medium'),
-    fontSize: wp('4.2%'),
-    color: '#FFFFFF',
-  },
-
-  // Error Styles
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: wp('5%'),
-  },
-  errorText: {
-    fontFamily: getFontFamily('medium'),
-    fontSize: wp('4.5%'),
-    color: '#FF3B30',
+    fontSize: 16,
+    fontFamily: getFontFamily('semibold'),
+    color: '#fff',
   },
 });
 

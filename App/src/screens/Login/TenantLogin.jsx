@@ -171,16 +171,13 @@ left={
   }
 right={
   <TextInput.Icon
-    icon={() => (
-      <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <AppIcon
-          name={hidePassword ? 'eye' : 'eyeSlash'}
-          width={22}
-          height={22}
-          color="#000"
-        />
-      </View>
-    )}
+         icon={() => (
+         <AppIcon
+        name={hidePassword ? icons.eye : icons.eyeSlash}
+        height={hp(2.3)}
+        width={hp(2.3)}
+      />
+      )}
     onPress={togglePasswordVisibility}
     forceTextInputFocus={false}
     style={{ marginRight: 8 }}
@@ -341,6 +338,7 @@ const styles = StyleSheet.create({
         fontFamily: getFontFamily('bold'),
         color: Colors.black
     },
+    
 });
 
 export default TenantLogin;

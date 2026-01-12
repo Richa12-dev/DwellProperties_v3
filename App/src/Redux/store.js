@@ -8,11 +8,11 @@ import aiReducer from './Ai/aiSlice';
 import { propertiesReducer } from './Properties/propertiesSlice';
 //import queriesReducer from './Queries/queriesSlice';
 import maintenanceReducer from './Maintenance/maintenanceSlice';
+import { tenantsReducer } from './Tenants/tenantsSlice';
+import contractorReducer from './ContractorServices/contractorSlice';
 
+import notificationReducer from './NotificationServices/notificationSlice';
 
-// import { disbursalReducer } from './Disbursal/disbursalSlice';
-// import { leadGenerationReducer } from './LeadGneration/leadGenerationSlice';
-// import { payoutReducer } from './Payout/payoutSlice';
 
 const persistConfig = {
   key: '@studyApp',
@@ -34,9 +34,18 @@ const aiPersistConfig = {
   whitelist: ['currentSessionId', 'messages'], // Only keep relevant data
 };
 
+const loginPersistConfig = {
+  key: 'login',
+  storage: AsyncStorage,
+  whitelist: ['accessToken', 'token', 'userData', 'is_logged'],
+};
+
+
 
 
 const rootReducer = combineReducers({
+//    loginData: persistReducer(loginPersistConfig, loginReducer),
+
   loginData: loginReducer,
   // chat: chatReducer,
 //    ai: aiReducer,
@@ -44,16 +53,10 @@ const rootReducer = combineReducers({
     ai: persistReducer(aiPersistConfig, aiReducer),
    properties: persistReducer(propertiesPersistConfig, propertiesReducer),
     maintenance: maintenanceReducer,
-   
-    
-    
-  // disbursalData: disbursalReducer,
-  // payoutData: payoutReducer,
-  // leadGenerationData:leadGenerationReducer,
-  // productData: productReducer,
-  // cartData: cartReducer,
-  // awpData: awpReducer,
-  // redeemData: redeemReducer,
+    tenants: tenantsReducer,
+    contractor: contractorReducer,
+    notifications: notificationReducer,
+
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

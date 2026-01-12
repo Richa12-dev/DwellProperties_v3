@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   View,
   Dimensions,
-  SafeAreaView,
   Image,
 } from 'react-native';
 
@@ -19,6 +18,7 @@ import { Colors } from '../../Theme';
 import { getFontFamily } from '../../utils';
 import { icons } from '../../Assets';
 import {AppIcon} from '../../components/AppIcon';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 

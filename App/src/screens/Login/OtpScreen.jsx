@@ -23,6 +23,8 @@ import { Colors } from '../../Theme';
 import { getFontFamily } from '../../utils';
 import { confirmSignUp, resendVerificationCode } from '../../Redux/Login/services';
 import { loginDataSelectors } from '../../Redux/Login/loginSlice';
+import {AppIcon} from '../../components/AppIcon';
+import { icons } from '../../Assets';
 
 const OtpScreen = ({ navigation, route }) => {
     const { email, phone } = route.params || {};
@@ -113,7 +115,7 @@ const OtpScreen = ({ navigation, route }) => {
                             style={styles.backButton}
                             onPress={() => navigation.goBack()}
                         >
-                            <Icon name="arrow-back" size={24} color="#1F2D3D" />
+                    <AppIcon name={icons.arrowBack} size={24} />
                         </TouchableOpacity>
 
                         {/* Heading */}

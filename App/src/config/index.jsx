@@ -1,14 +1,19 @@
 export const Config = {
-  // API_URL: 'https://us-east-18gh6qa2z0.auth.us-east-1.amazoncognito.com',
+
   API_URL: 'https://3hc254p0l3.execute-api.us-east-1.amazonaws.com/prod/auth',
   COGNITO_REGION: 'us-east-1',
   COGNITO_CLIENT_ID: '4vq7alk8e8uu9ajt3hh4tassk2',
   COGNITO_IDP_URL: 'https://cognito-idp.us-east-1.amazonaws.com/',
   CHAT_API_URL: 'https://lugv3mp9l6.execute-api.us-east-1.amazonaws.com/chat',
-  PROPERTIES_API_URL :'https://1vmmxi10ue.execute-api.us-east-1.amazonaws.com/items',
+  PROPERTIES_API_URL :'https://70q2ntiu1f.execute-api.us-east-1.amazonaws.com/prod/properties',
+ 
   
    // Maintenance Authorization API
-  MAINTENANCE_API_URL: 'https://mo4vh9rkai.execute-api.us-east-1.amazonaws.com/prod/maintenanceAuthorization',
+  MAINTENANCE_API_URL: 'https://mo4vh9rkai.execute-api.us-east-1.amazonaws.com/prod/maintenance',
+  
+  maintenance_url: 'https://mo4vh9rkai.execute-api.us-east-1.amazonaws.com/prod/maintenance',
+  GEOCODING_API_URL : 'https://ispmhrf3y4.execute-api.us-east-1.amazonaws.com/geocode',
+
   
   
   USER_SERVICE: {
@@ -29,8 +34,8 @@ export const Config = {
   ENABLE_FALLBACK_AI: true,
   
   // Timeout settings
-  PRIMARY_API_TIMEOUT: 30000,    // 30 seconds
-  GEMINI_API_TIMEOUT: 45000,     // 45 seconds
+  PRIMARY_API_TIMEOUT: 30000,   
+  GEMINI_API_TIMEOUT: 45000,
   SUGGESTION_TIMEOUT: 15000,  
 
  ENDPOINTS: {

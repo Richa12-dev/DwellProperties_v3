@@ -9,87 +9,6 @@ import { Buffer } from 'buffer';
 // const navigation = useNavigation();
 const base_url = Config.API_URL;
 
-// export const login = createAsyncThunk(
-//   'loginSlice/login',
-//   async (post, { rejectWithValue }) => {
-//     const url = `https://cognito-idp.us-east-1.amazonaws.com/`;
-
-//     try {
-//       const response = await fetch(url, {
-//         method: 'POST',
-//         headers: {
-//           'Content-Type': 'application/x-amz-json-1.1',
-//           'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
-//         },
-//         body: JSON.stringify({
-//           AuthFlow: 'USER_PASSWORD_AUTH',
-//           ClientId: Config.COGNITO_CLIENT_ID, // "4vq7alk8e8uu9ajt3hh4tassk2"
-//           AuthParameters: {
-//             USERNAME: post?.username || post?.email,
-//             PASSWORD: post?.password,
-//           },
-//         }),
-//       });
-
-//       const data = await response.json();
-
-//       if (response.ok && data?.AuthenticationResult?.AccessToken) {
-//         // resetRoot('BottomFotter');
-//         Toast.show('Login successful');
-//         // 🔑 Extract custom claims if you decode ID token
-//         const idToken = data.AuthenticationResult.IdToken;
-//         const payload = JSON.parse(
-//           Buffer.from(idToken.split('.')[1], 'base64').toString()
-//         );
-
-//         const userData = {
-//           token: data.AuthenticationResult.AccessToken,
-//           accessToken: data.AuthenticationResult.AccessToken,
-//           idToken: data.AuthenticationResult.IdToken,
-//           refreshToken: data.AuthenticationResult.RefreshToken,
-//           landlordId: payload['custom:landlordId'] || null,
-//           tenantId: payload['custom:tenantId'] || null,
-//           role: payload['custom:role'] || 'tenant',
-//           email: payload['email'],
-//         };
-//  // Navigate after a small delay to ensure Redux state updates
-//         setTimeout(() => {
-//           if (payload['custom:tenantId']) {
-//             resetRoot('BottomFotter');
-//           } else if (payload['custom:landlordId']) {
-//             resetRoot('ProfileFooter');
-//           } else {
-//             resetRoot('BottomFotter'); // default fallback
-//           }
-//         }, 300); // 300ms delay
-
-      
-
-//         // if (payload['custom:tenantId']) {
-//         //   resetRoot('BottomFotter');
-//         // } else if (payload['custom:landlordId']) {
-//         //   resetRoot('ProfileFooter');
-//         // } else {
-//         //   resetRoot('BottomFotter'); // default fallback
-//         // }
-//         // return data;
-//         return userData;
-//       } else {
-//         const errorMessage = data?.message || 'Invalid credentials';
-//         Toast.show(errorMessage);
-//         return rejectWithValue(errorMessage);
-//       }
-//     } catch (err) {
-//       console.error('Login error:', err);
-//       Toast.show('Oops, there seems to be an error');
-//       return rejectWithValue(err.message || 'Oops, there seems to be an error');
-//     }
-//   }
-// );
-
-
-// Login with new API
-
 
 
 export const login = createAsyncThunk(
@@ -115,7 +34,7 @@ export const login = createAsyncThunk(
         Toast.show('Login successfully');
 
           console.log(data.accessToken, "fsdfghjgf");
-        // 🔥 DECODE THE ID TOKEN TO GET USER INFO
+        // DECODE THE ID TOKEN TO GET USER INFO
         let landlordId = null;
         let tenantId = null;
         let contractorId = null;
@@ -124,6 +43,7 @@ export const login = createAsyncThunk(
         let firstName = '';
         let lastName = '';
         let phoneNumber = '';
+          let isFirstLogin = false;
 
         if (data.idToken) {
           try {
@@ -144,25 +64,22 @@ export const login = createAsyncThunk(
             landlordId = payload['custom:landlordId'] || null;
             tenantId = payload['custom:tenantId'] || null;
             contractorId = payload['custom:contractorId'] || null;
-
-            // If custom attributes don't exist, check cognito:groups
+            isFirstLogin = payload['custom:isFirstLogin'] === 'true' || payload['custom:isFirstLogin'] === true;
+        
             if (!landlordId && !tenantId && !contractorId) {
               const groups = payload['cognito:groups'] || [];
-              console.log('📋 Cognito Groups:', groups);
               
               if (groups.includes('landlord')) {
-                // Use the sub (user ID) as landlordId if not explicitly set
+    
                 landlordId = payload.sub;
                 role = 'landlord';
-                console.log('✅ Identified as LANDLORD from groups');
+               
               } else if (groups.includes('tenant')) {
                 tenantId = payload.sub;
                 role = 'tenant';
-                console.log('✅ Identified as TENANT from groups');
               } else if (groups.includes('contractor')) {
                 contractorId = payload.sub;
                 role = 'contractor';
-                console.log('✅ Identified as CONTRACTOR from groups');
               }
             }
           } catch (decodeError) {
@@ -182,33 +99,26 @@ export const login = createAsyncThunk(
           firstName: firstName,
           lastName: lastName,
           phoneNumber: phoneNumber,
+          isFirstLogin: isFirstLogin,
         };
 
         console.log('✅ Final userData:', userData);
-        console.log('🚀 Navigation Decision:', {
-          hasLandlordId: !!landlordId,
-          hasTenantId: !!tenantId,
-          hasContractorId: !!contractorId,
-          role: role,
-          navigatingTo: tenantId ? 'BottomFotter (Tenant)' :
-                       landlordId ? 'ProfileFooter (Landlord)' :
-                       contractorId ? 'ContractorHome (Contractor)' :
-                       'BottomFotter (Default)'
-        });
 
         // Navigate based on role/IDs
         setTimeout(() => {
           if (tenantId) {
-            console.log('🏠 Navigating to: BottomFotter');
             resetRoot('BottomFotter');
           } else if (landlordId) {
-            console.log('🏢 Navigating to: ProfileFooter');
             resetRoot('ProfileFooter');
           } else if (contractorId) {
-            console.log('🔧 Navigating to: ContractorHome');
-            resetRoot('ContractorHome');
+              if (isFirstLogin) {
+                  resetRoot('Welcome');
+              }else {
+                  resetRoot('ContractorHome');
+                }
+              
           } else {
-            console.log('⚠️ Navigating to: BottomFotter (Default)');
+            console.log(' Navigating to: BottomFotter (Default)');
             resetRoot('BottomFotter');
           }
         }, 300);
@@ -228,86 +138,6 @@ export const login = createAsyncThunk(
 );
 
 
-//
-//export const login = createAsyncThunk(
-//  'loginSlice/login',
-//  async (post, { rejectWithValue }) => {
-//    const url = `${base_url}/login`;
-//
-//    try {
-//      const response = await fetch(url, {
-//        method: 'POST',
-//        headers: {
-//          'Content-Type': 'application/json',
-//        },
-//        body: JSON.stringify({
-//          email: post?.email || post?.username,
-//          password: post?.password,
-//        }),
-//      });
-//
-//      const data = await response.json();
-//        
-//        // 🔍 ADD THIS DEBUG LOG
-//              console.log('📊 Full API Response:', JSON.stringify(data, null, 2));
-//              console.log('👤 User data:', data.user);
-//              console.log('🏠 Landlord ID:', data.user?.landlordId);
-//              console.log('🏢 Tenant ID:', data.user?.tenantId);
-//        
-//      if (response.ok && data?.accessToken) {
-//        Toast.show('Login successful');
-//
-//        const userData = {
-//          accessToken: data.accessToken,
-//          idToken: data.idToken,
-//          refreshToken: data.refreshToken,
-//          landlordId: data.user?.landlordId || null,
-//          tenantId: data.user?.tenantId || null,
-//          contractorId: data.user?.contractorId || null,
-//          role: data.user?.role || 'tenant',
-//          email: data.user?.email || '',
-//          firstName: data.user?.firstName || '',
-//          lastName: data.user?.lastName || '',
-//          phoneNumber: data.user?.phoneNumber || '',
-//        };
-//          
-//          // 🔍 ADD THIS DEBUG LOG TOO
-//                  console.log('✅ Navigation Decision:', {
-//                    hasLandlordId: !!data.user?.landlordId,
-//                    hasTenantId: !!data.user?.tenantId,
-//                    hasContractorId: !!data.user?.contractorId,
-//                    willNavigateTo: data.user?.tenantId ? 'BottomFotter' :
-//                                   data.user?.landlordId ? 'ProfileFooter' :
-//                                   data.user?.contractorId ? 'ContractorHome' :
-//                                   'BottomFotter (default)'
-//                  });
-//          
-//        // Navigate based on role
-//        setTimeout(() => {
-//          if (data.user?.tenantId) {
-//            resetRoot('BottomFotter');
-//          } else if (data.user?.landlordId) {
-//            resetRoot('ProfileFooter');
-//          } else if (data.user?.contractorId) {
-//            resetRoot('ContractorHome'); // Adjust based on your navigation
-//          } else {
-//            resetRoot('BottomFotter'); // default fallback
-//          }
-//        }, 300);
-//
-//        return userData;
-//      } else {
-//        const errorMessage = data?.message || data?.error || 'Invalid credentials';
-//        Toast.show(errorMessage);
-//        return rejectWithValue(errorMessage);
-//      }
-//    } catch (err) {
-//      console.error('Login error:', err);
-//      Toast.show('Oops, there seems to be an error');
-//      return rejectWithValue(err.message || 'Oops, there seems to be an error');
-//    }
-//  }
-//);
 
 export const registerUser = createAsyncThunk(
   'loginSlice/registerUser',
@@ -350,6 +180,44 @@ export const registerUser = createAsyncThunk(
     }
   }
 );
+
+
+
+export const submitContractorServices = createAsyncThunk(
+  'contractor/submitContractorServices',
+  async (params, { rejectWithValue }) => {
+    const url = `${base_url}/contractor/services`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${params.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          services: params.selectedServices  // Send selected
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return {
+          selectedServices: params.selectedServices,
+          response: data
+        };
+      } else {
+        return rejectWithValue(data?.message || 'Failed to submit services');
+      }
+    } catch (err) {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
+
+
 
 // Confirm OTP/Verification
 export const confirmSignUp = createAsyncThunk(
@@ -525,145 +393,6 @@ export const logout = createAsyncThunk(
   }
 );
 
-// export const registerUser = createAsyncThunk(
-//   'loginSlice/registerUser',
-//   async (userData, { rejectWithValue }) => {
-//     const url = Config.COGNITO_IDP_URL;
-
-//     try {
-//       const response = await fetch(url, {
-//         method: 'POST',
-//         headers: {
-//           'Content-Type': Config.HEADERS.CONTENT_TYPE,
-//           'X-Amz-Target': Config.ENDPOINTS.SIGN_UP,
-//         },
-//         body: JSON.stringify({
-//           ClientId: Config.COGNITO_CLIENT_ID,
-//           Username: userData.email,
-//           Password: userData.password,
-//           UserAttributes: [
-//             { Name: 'email', Value: userData.email },
-//             { Name: 'phone_number', Value: userData.phoneNumber },
-//             { Name: 'given_name', Value: userData.firstName },
-//             { Name: 'family_name', Value: userData.lastName },
-//             { Name: 'custom:role', Value: userData.role || 'tenant' },
-//             { Name: 'custom:tenantId', Value: userData.tenantId || '' },
-//             { Name: 'custom:landlordId', Value: userData.landlordId || '' },
-//             // Add contractorId if needed
-//             ...(userData.contractorId ? [{ Name: 'custom:contractorId', Value: userData.contractorId }] : [])
-//           ],
-//         }),
-//       });
-
-//       const data = await response.json();
-
-//       if (response.ok) {
-//         Toast.show('Registration successful! Please check your email for verification code.');
-//         return {
-//           ...data,
-//           userSub: data.UserSub,
-//           email: userData.email,
-//         };
-//       } else {
-//         const errorMessage = data?.message || 'Registration failed';
-//         Toast.show(errorMessage);
-//         return rejectWithValue(errorMessage);
-//       }
-//     } catch (err) {
-//       console.error('Registration error:', err);
-//       Toast.show('Oops, there seems to be an error during registration');
-//       return rejectWithValue(err.message || 'Oops, there seems to be an error');
-//     }
-//   }
-// );
-
-// Confirm OTP API
-
-// export const confirmSignUp = createAsyncThunk(
-//   'loginSlice/confirmSignUp',
-//   async (otpData, { rejectWithValue }) => {
-//     const url = Config.COGNITO_IDP_URL;
-
-//     try {
-//       const response = await fetch(url, {
-//         method: 'POST',
-//         headers: {
-//           'Content-Type': Config.HEADERS.CONTENT_TYPE,
-//           'X-Amz-Target': Config.ENDPOINTS.CONFIRM_SIGN_UP,
-//         },
-//         body: JSON.stringify({
-//           ClientId: Config.COGNITO_CLIENT_ID,
-//           Username: otpData.email,
-//           ConfirmationCode: otpData.otpCode,
-//         }),
-//       });
-
-//       const data = await response.json();
-
-//       if (response.ok) {
-//         Toast.show('Email verification successful! You can now login.');
-//         // Navigate to login screen or auto-login
-//         navigate('LoginScreen'); // Adjust route name as needed
-//         return data;
-//       } else {
-//         const errorMessage = data?.message || 'OTP verification failed';
-//         Toast.show(errorMessage);
-//         return rejectWithValue(errorMessage);
-//       }
-//     } catch (err) {
-//       console.error('OTP verification error:', err);
-//       Toast.show('Oops, there seems to be an error during verification');
-//       return rejectWithValue(err.message || 'Oops, there seems to be an error');
-//     }
-//   }
-// );
-
-
-// export const logout = createAsyncThunk(
-//   'loginSlice/logout',
-//   async (params, { dispatch, rejectWithValue }) => {
-//     const url = `https://cognito-idp.us-east-1.amazonaws.com/`;
-    
-//     try {
-//       // First, try to sign out from Cognito if we have a token
-//       if (params?.token) {
-//         const cognitoResponse = await fetch(url, {
-//           method: 'POST',
-//           headers: {
-//             'Content-Type': 'application/x-amz-json-1.1',
-//             'X-Amz-Target': 'AWSCognitoIdentityProviderService.GlobalSignOut',
-//           },
-//           body: JSON.stringify({
-//             AccessToken: params.token,
-//           }),
-//         });
-
-//         // Log the response but don't fail if Cognito logout fails
-//         if (!cognitoResponse.ok) {
-//           console.warn('Cognito logout failed, but continuing with local logout');
-//         }
-//       }
-
-//       // Clear all local data regardless of Cognito response
-//       dispatch(clearLoginData());
-      
-//       // Navigate to login screen
-//       resetRoot('Login');
-//       Toast.show('Logged out successfully');
-      
-//       return true;
-//     } catch (err) {
-//       console.error('Logout error:', err);
-      
-//       // Even if there's an error, clear local data and navigate
-//       dispatch(clearLoginData());
-//       resetRoot('Login');
-//       Toast.show('Logged out successfully');
-      
-//       return true; // Return success to avoid showing error to user
-//     }
-//   }
-// );
 
 
 export const associateLogin = createAsyncThunk(
@@ -702,62 +431,6 @@ export const associateLogin = createAsyncThunk(
 
 
 
-// export const forgotPassword = createAsyncThunk(
-//   'loginSlice/forgotPassword',
-
-//   async (params, { rejectWithValue }) => {
-//     console.log(params, 'paramsparams');
-//     let url = base_url + Config.USER_SERVICE.FORGOT_PASSWORD;
-//     url = url.replace('bridge-app/', '');
-//     url = url.replace('dealerCode', params?.dealerCode);
-//     try {
-//       const response = await fetch(url, {
-//         method: 'GET',
-//         headers: {
-//           'Content-Type': 'application/json',
-//         },
-//       });
-
-//       const data = await response.json();
-
-//       Toast.show(data?.Message, 2000);
-//       return data;
-//     } catch (err) {
-//       console.log(err, 'errerr');
-//       return rejectWithValue('Opps there seems to be an error');
-//     }
-//   },
-// );
-
-// export const logout = createAsyncThunk(
-//   'loginSlice/logout',
-
-//   async (params, {rejectWithValue}) => {
-//     console.log(params, 'paramsparams');
-//     let url = base_url + Config.USER_SERVICE.LOG_OUT;
-//     url = url.replace('bridge-app/', '');
-//     try {
-//       const response = await fetch(url, {
-//         method: 'POST',
-//         body: JSON.stringify({
-//           token: params.token,
-//         }),
-//         headers: {
-//           'Content-Type': 'application/json',
-//         },
-//       });
-
-//       const data = await response.json();
-//       Toast.show('Logout successful');
-
-//       resetRoot('Login');
-//       return data;
-//     } catch (err) {
-//       console.log(err, 'errerr');
-//       return rejectWithValue('Opps there seems to be an error');
-//     }
-//   },
-// );
 
 export const otpVerify = createAsyncThunk(
   'loginSlice/otpVerify',

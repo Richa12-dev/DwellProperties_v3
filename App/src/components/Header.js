@@ -7,15 +7,24 @@ import {Colors} from '../Theme';
 import {getFontFamily} from '../utils';
 import {AppIcon} from './AppIcon';
 
-const Header = ({...props}) => {
+const Header = ({onBackPress, ...props}) => {
   const navigation = useNavigation();
+    
+    const handleBackPress = () => {
+        if (onBackPress) {
+          onBackPress();
+        } else if (navigation.canGoBack()) {
+          navigation.goBack();
+        }
+      };
+    
   return (
     <View style={{...style.container, ...props.container}}>
       <TouchableOpacity
-        onPress={() => navigation.goBack()}
+          onPress={handleBackPress}
         style={{flex: 0.1}}
         hitSlop={{top: 20, bottom: 20, right: 20}}>
-        <AppIcon name={props.icon ? props.icon : icons.backIcon} size={wp(5)} />
+        <AppIcon name={props.icon ? props.icon : icons.arrowBack} size={wp(5)} />
       </TouchableOpacity>
       <View style={{justifyContent: 'center', flex: 1}}>
         <Text style={{...style.titleStyle2, ...props.textstyle}}>
@@ -37,7 +46,7 @@ const style = StyleSheet.create({
   titleStyle2: {
     fontSize: wp(5),
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.black,
     fontFamily: getFontFamily('bold'),
   },
 });

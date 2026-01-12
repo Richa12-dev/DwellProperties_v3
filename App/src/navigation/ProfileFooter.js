@@ -220,7 +220,9 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import {createNativeBottomTabNavigator} from '@bottom-tabs/react-navigation';
+//import {createNativeBottomTabNavigator} from '@bottom-tabs/react-navigation';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
 import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
@@ -235,8 +237,11 @@ import LandlordDashboardView from '../screens/Dashboard/LandlordDashboardView';
 import LandlordProperties from '../screens/Properties/LandlordProperties';
 import LandlordSupport from '../screens/Support/LandlordSupport';
 import AIAssistant from '../screens/AIAssistant/AIAssistant';
+import AddPropertiesScreen from '../screens/Properties/AddPropertiesScreen';
+import PropertiesDetails from '../screens/Properties/PropertiesDetails';
+import LandlordTicketDetails from '../screens/Support/LandlordTicketDetails';
 
-const Tab = createNativeBottomTabNavigator();
+const Tab = createBottomTabNavigator();
 
 // Custom Bubble Tab Bar (copied from BottonFooter)
 const CustomTabBarOverlay = ({state, descriptors, navigation}) => {
@@ -355,6 +360,28 @@ const ProfileFooter = ({navigation, route}) => {
         <Tab.Screen name="Properties" component={LandlordProperties} />
         <Tab.Screen name="Support" component={LandlordSupport} />
         <Tab.Screen name="AIAssistant" component={AIAssistant} />
+          
+          <Tab.Screen
+                    name="AddPropertiesScreen"
+                    component={AddPropertiesScreen}
+                    options={{
+                      tabBarButton: () => null, // Hide from tab bar
+                    }}
+                  />
+                  <Tab.Screen
+                    name="PropertiesDetails"
+                    component={PropertiesDetails}
+                    options={{
+                      tabBarButton: () => null, // Hide from tab bar
+                    }}
+                  />
+                  <Tab.Screen
+                    name="LandlordTicketDetails"
+                    component={LandlordTicketDetails}
+                    options={{
+                      tabBarButton: () => null, // Hide from tab bar
+                    }}
+                  />
       </Tab.Navigator>
     </View>
   );

@@ -6,7 +6,9 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import {createNativeBottomTabNavigator} from '@bottom-tabs/react-navigation';
+//import {createNativeBottomTabNavigator} from '@bottom-tabs/react-navigation';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
 import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
@@ -20,7 +22,7 @@ import AIAssistant from '../screens/AIAssistant/AIAssistant';
 import Support from '../screens/Support/Support';
 import TenantPayments from '../screens/Payment/TenantPayments';
 
-const Tab = createNativeBottomTabNavigator();
+const Tab = createBottomTabNavigator();
 
 // Custom Tab Bar Overlay Component
 const CustomTabBarOverlay = ({state, descriptors, navigation}) => {

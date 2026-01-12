@@ -5,8 +5,8 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  ScrollView,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import {
   heightPercentageToDP as hp,
@@ -15,7 +15,6 @@ import {
 import { Dropdown } from 'react-native-element-dropdown';
 import { Colors } from '../../Theme';
 import { getFontFamily } from '../../utils';
-import CustomButton from '../../components/CustomButton';
 
 const FilterModal = ({ visible, filters, onClose, onApply }) => {
   const [localFilters, setLocalFilters] = useState(filters);
@@ -37,38 +36,22 @@ const FilterModal = ({ visible, filters, onClose, onApply }) => {
 
   const levelData = [
     { label: 'All', value: 'All' },
-    { label: 'L1', value: 'L1' },
-    { label: 'L2', value: 'L2' },
+    { label: 'Level 1', value: 'L1' },
+    { label: 'Level 2', value: 'L2' },
   ];
 
-  const assignedToData = [
-    { label: 'All', value: 'All' },
-    { label: 'Support Agent 1', value: 'Support Agent 1' },
-    { label: 'Support Agent 2', value: 'Support Agent 2' },
-    { label: 'Support Agent 3', value: 'Support Agent 3' },
-    { label: 'Senior Agent', value: 'Senior Agent' },
-    { label: 'Unassigned', value: 'Unassigned' },
-  ];
-
-  const handleApply = () => {
-    onApply(localFilters);
-  };
+  const handleApply = () => onApply(localFilters);
 
   const handleReset = () => {
-    const resetFilters = {
+    setLocalFilters({
       status: 'All',
       priority: 'All',
       level: 'All',
-      assignedTo: 'All',
-    };
-    setLocalFilters(resetFilters);
+    });
   };
 
   const updateFilter = (key, value) => {
-    setLocalFilters(prev => ({
-      ...prev,
-      [key]: value,
-    }));
+    setLocalFilters(prev => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -77,156 +60,122 @@ const FilterModal = ({ visible, filters, onClose, onApply }) => {
       transparent
       animationType="slide"
       onRequestClose={onClose}
-      // CRITICAL: Android specific props
-      hardwareAccelerated={true}
-      statusBarTranslucent={true}
-      supportedOrientations={['portrait']}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Filter Tickets</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>×</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
+        <TouchableOpacity
+          style={styles.backdropTouchable}
+          activeOpacity={1}
+          onPress={onClose}
+        >
+          <View style={styles.modalWrapper}>
+            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.modalContent}>
+                {/* Handle bar */}
+                <View style={styles.handleBar} />
+                
+                {/* Header */}
+                <View style={styles.header}>
+                  <Text style={styles.headerTitle}>Filter Tickets</Text>
+                  <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                    <Text style={styles.closeButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Filters Container */}
+                <View style={styles.filtersContainer}>
+                  
+                  {/* Status */}
+                  <View style={styles.filterRow}>
+                    <Text style={styles.filterLabel}>Status</Text>
+                    <Dropdown
+                      style={styles.dropdown}
+                      containerStyle={styles.dropdownContainer}
+                      data={statusData}
+                      labelField="label"
+                      valueField="value"
+                      placeholder="Select Status"
+                      placeholderStyle={styles.dropdownPlaceholder}
+                      selectedTextStyle={styles.dropdownSelectedText}
+                      itemTextStyle={styles.dropdownItemText}
+                      value={localFilters.status}
+                      onChange={(item) => updateFilter('status', item.value)}
+                      renderRightIcon={() => <Text style={styles.dropdownIcon}>▼</Text>}
+                      maxHeight={150}
+                      dropdownPosition="auto"
+                    />
+                  </View>
+
+                  {/* Priority Level */}
+                  <View style={styles.filterRow}>
+                    <Text style={styles.filterLabel}>Priority Level</Text>
+                    <Dropdown
+                      style={styles.dropdown}
+                      containerStyle={styles.dropdownContainer}
+                      data={priorityData}
+                      labelField="label"
+                      valueField="value"
+                      placeholder="Select Priority Level"
+                      placeholderStyle={styles.dropdownPlaceholder}
+                      selectedTextStyle={styles.dropdownSelectedText}
+                      itemTextStyle={styles.dropdownItemText}
+                      value={localFilters.priority}
+                      onChange={(item) => updateFilter('priority', item.value)}
+                      renderRightIcon={() => <Text style={styles.dropdownIcon}>▼</Text>}
+                      maxHeight={150}
+                      dropdownPosition="auto"
+                    />
+                  </View>
+
+                  {/* Support Level */}
+                  <View style={styles.filterRow}>
+                    <Text style={styles.filterLabel}>Support Level</Text>
+                    <Dropdown
+                      style={styles.dropdown}
+                      containerStyle={styles.dropdownContainer}
+                      data={levelData}
+                      labelField="label"
+                      valueField="value"
+                      placeholder="Select Support Level"
+                      placeholderStyle={styles.dropdownPlaceholder}
+                      selectedTextStyle={styles.dropdownSelectedText}
+                      itemTextStyle={styles.dropdownItemText}
+                      value={localFilters.level}
+                      onChange={(item) => updateFilter('level', item.value)}
+                      renderRightIcon={() => <Text style={styles.dropdownIcon}>▼</Text>}
+                      maxHeight={150}
+                      dropdownPosition="auto"
+                    />
+                  </View>
+
+                </View>
+
+                {/* Buttons Section */}
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity
+                    style={styles.resetButton}
+                    onPress={handleReset}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.resetButtonText}>Reset</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.applyButton}
+                    onPress={handleApply}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.applyButtonText}>Apply Filters</Text>
+                  </TouchableOpacity>
+                </View>
+
+              </View>
             </TouchableOpacity>
           </View>
-
-          <ScrollView 
-            style={styles.filtersContainer}
-            nestedScrollEnabled={true}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Status</Text>
-              <Dropdown
-                style={styles.dropdown}
-                containerStyle={styles.dropdownContainer}
-                data={statusData}
-                labelField="label"
-                valueField="value"
-                placeholder="Select Status"
-                placeholderStyle={styles.dropdownPlaceholder}
-                selectedTextStyle={styles.dropdownSelectedText}
-                
-                itemTextStyle={styles.dropdownItemText}
-                value={localFilters.status}
-                onChange={(item) => updateFilter('status', item.value)}
-                // CRITICAL: Android dropdown properties
-                renderRightIcon={() => (
-                  <Text style={styles.dropdownIcon}>▼</Text>
-                )}
-                search={false}
-                maxHeight={200}
-                disable={false}
-                // CRITICAL: Force render mode
-                flatListProps={{
-                  keyboardShouldPersistTaps: 'handled',
-                  nestedScrollEnabled: true,
-                }}
-              />
-            </View>
-
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Priority</Text>
-              <Dropdown
-                style={styles.dropdown}
-                containerStyle={styles.dropdownContainer}
-                data={priorityData}
-                labelField="label"
-                valueField="value"
-                placeholder="Select Priority"
-                placeholderStyle={styles.dropdownPlaceholder}
-                selectedTextStyle={styles.dropdownSelectedText}
-                itemTextStyle={styles.dropdownItemText}
-                value={localFilters.priority}
-                onChange={(item) => updateFilter('priority', item.value)}
-                renderRightIcon={() => (
-                  <Text style={styles.dropdownIcon}>▼</Text>
-                )}
-                search={false}
-                maxHeight={200}
-                flatListProps={{
-                  keyboardShouldPersistTaps: 'handled',
-                  nestedScrollEnabled: true,
-                }}
-              />
-            </View>
-
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Level</Text>
-              <Dropdown
-                style={styles.dropdown}
-                containerStyle={styles.dropdownContainer}
-                data={levelData}
-                labelField="label"
-                valueField="value"
-                placeholder="Select Level"
-                placeholderStyle={styles.dropdownPlaceholder}
-                selectedTextStyle={styles.dropdownSelectedText}
-                itemTextStyle={styles.dropdownItemText}
-                value={localFilters.level}
-                onChange={(item) => updateFilter('level', item.value)}
-                renderRightIcon={() => (
-                  <Text style={styles.dropdownIcon}>▼</Text>
-                )}
-                search={false}
-                maxHeight={200}
-                flatListProps={{
-                  keyboardShouldPersistTaps: 'handled',
-                  nestedScrollEnabled: true,
-                }}
-              />
-            </View>
-
-            {/* <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Assigned To</Text>
-              <Dropdown
-                style={styles.dropdown}
-                containerStyle={styles.dropdownContainer}
-                data={assignedToData}
-                labelField="label"
-                valueField="value"
-                placeholder="Select Agent"
-                placeholderStyle={styles.dropdownPlaceholder}
-                selectedTextStyle={styles.dropdownSelectedText}
-                itemTextStyle={styles.dropdownItemText}
-                value={localFilters.assignedTo}
-                onChange={(item) => updateFilter('assignedTo', item.value)}
-                renderRightIcon={() => (
-                  <Text style={styles.dropdownIcon}>▼</Text>
-                )}
-                search={false}
-                maxHeight={200}
-                flatListProps={{
-                  keyboardShouldPersistTaps: 'handled',
-                  nestedScrollEnabled: true,
-                }}
-              />
-            </View> */}
-          </ScrollView>
-
-          <View style={styles.buttonContainer}>
-            <View style={styles.buttonRow}>
-              <CustomButton
-                title="Reset"
-                size={16}
-                action={handleReset}
-                color="#e0e0e0"
-                textColor="#333"
-                style={[styles.button, styles.resetButton]}
-              />
-              <CustomButton
-                title="Apply Filters"
-                size={16}
-                action={handleApply}
-                color={Colors.primary}
-                textColor="white"
-                style={[styles.button, styles.applyButton]}
-              />
-            </View>
-          </View>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -234,125 +183,136 @@ const FilterModal = ({ visible, filters, onClose, onApply }) => {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    // CRITICAL: High elevation for Android
-    elevation: 1000,
-    zIndex: 1000,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  backdropTouchable: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalWrapper: {
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: wp('5%'),
-    width: wp('90%'),
-    maxHeight: hp('80%'),
-    // CRITICAL: Modal content elevation
-    elevation: 999,
-    zIndex: 999,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: hp(1),
+    paddingBottom: Platform.OS === 'ios' ? hp(4) : hp(2),
+  },
+  handleBar: {
+    width: wp(12),
+    height: hp(0.5),
+    backgroundColor: '#D1D5DB',
+    borderRadius: 10,
+    alignSelf: 'center',
+    marginBottom: hp(1.5),
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: hp('3%'),
+    paddingHorizontal: wp(5),
+    marginBottom: hp(2),
   },
   headerTitle: {
-    fontSize: wp('5%'),
+    fontSize: hp(2.5),
     fontFamily: getFontFamily('bold'),
-    color: '#333',
+    fontWeight: '700',
+    color: '#111827',
   },
   closeButton: {
-    padding: wp('2%'),
+    width: wp(8),
+    height: wp(8),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   closeButtonText: {
-    fontSize: wp('6%'),
-    color: '#666',
+    fontSize: hp(4),
+    color: '#6B7280',
+    fontWeight: '300',
   },
   filtersContainer: {
-    maxHeight: hp('50%'),
+    paddingHorizontal: wp(5),
+    marginBottom: hp(2),
   },
   filterRow: {
-    marginBottom: hp('3%'),
-    // CRITICAL: Ensure proper positioning
-    zIndex: 1,
+    marginBottom: hp(2),
   },
   filterLabel: {
-    fontSize: wp('4%'),
-    fontFamily: getFontFamily('medium'),
-    color: '#333',
-    marginBottom: hp('1%'),
+    fontSize: hp(1.8),
+    fontFamily: getFontFamily('semiBold'),
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: hp(1),
   },
   dropdown: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: wp('3%'),
-    paddingVertical: hp('1.5%'),
-    backgroundColor: 'white',
-    // CRITICAL: Base elevation for dropdown
-    elevation: Platform.OS === 'android' ? 5 : 0,
-    shadowColor: Platform.OS === 'ios' ? '#000' : undefined,
-    shadowOffset: Platform.OS === 'ios' ? { width: 0, height: 2 } : undefined,
-    shadowOpacity: Platform.OS === 'ios' ? 0.1 : undefined,
-    shadowRadius: Platform.OS === 'ios' ? 4 : undefined,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
+    backgroundColor: '#FFFFFF',
   },
-  // CRITICAL: Dropdown container styling
   dropdownContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
-    // CRITICAL: Very high elevation for dropdown options
-    elevation: Platform.OS === 'android' ? 1001 : 0,
-    zIndex: 1001,
-    shadowColor: Platform.OS === 'ios' ? '#000' : undefined,
-    shadowOffset: Platform.OS === 'ios' ? { width: 0, height: 4 } : undefined,
-    shadowOpacity: Platform.OS === 'ios' ? 0.2 : undefined,
-    shadowRadius: Platform.OS === 'ios' ? 8 : undefined,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginTop: hp(0.5),
   },
   dropdownPlaceholder: {
-    fontSize: wp('4%'),
-    color: '#999',
+    fontSize: hp(1.8),
+    color: '#9CA3AF',
     fontFamily: getFontFamily('regular'),
   },
   dropdownSelectedText: {
-    fontSize: wp('4%'),
-    color: '#333',
-    fontFamily: getFontFamily('regular'),
+    fontSize: hp(1.8),
+    color: '#111827',
+    fontFamily: getFontFamily('medium'),
   },
-//   dropdownItemText: {
-//     fontSize: wp('4%'),
-//     color: '#333',
-//     fontFamily: getFontFamily('regular'),
-//     paddingVertical: 5,
-//   },
   dropdownItemText: {
-  fontFamily: getFontFamily('regular'),
-  fontSize: wp('4%'),
-  color: '#1C1C1E',   // dark text (visible on white)
-},
-
+    fontSize: hp(1.8),
+    color: '#374151',
+    fontFamily: getFontFamily('regular'),
+    paddingVertical: hp(1),
+  },
   dropdownIcon: {
-    fontSize: wp('3%'),
-    color: '#666',
+    fontSize: hp(1.2),
+    color: '#6B7280',
   },
   buttonContainer: {
-    marginTop: hp('2%'),
-  },
-  buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  button: {
-    flex: 1,
-    borderRadius: 10,
+    paddingHorizontal: wp(5),
+    paddingTop: hp(1),
+    gap: wp(3),
   },
   resetButton: {
-    marginRight: wp('2%'),
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingVertical: hp(1.8),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    fontSize: hp(1.9),
+    fontFamily: getFontFamily('semiBold'),
+    fontWeight: '600',
+    color: '#374151',
   },
   applyButton: {
-    marginLeft: wp('2%'),
+    flex: 1,
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    paddingVertical: hp(1.8),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    fontSize: hp(1.9),
+    fontFamily: getFontFamily('semiBold'),
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 

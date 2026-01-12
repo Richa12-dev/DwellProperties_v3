@@ -5,17 +5,20 @@ import {
   getMaintenanceRequests,
   getMaintenanceDetails,
   updateMaintenanceStatus,
+  escalateMaintenanceRequest,
 } from "./services";
 
 const initialState = {
   maintenanceRequests: [],
   currentRequest: null,
   loading: false,
+  detailsLoading: false,
   error: null,
   totalRequests: 0,
   openRequests: 0,
   closedRequests: 0,
   lastUpdated: null,
+  inProgressRequests: 0,
 };
 
 const maintenanceSlice = createSlice({
@@ -31,7 +34,7 @@ const maintenanceSlice = createSlice({
     updateRequestLocally: (state, { payload }) => {
       const updateInArray = (array) => {
         const index = array.findIndex(
-          (r) => r.id === payload.id || r.request_id === payload.request_id
+          (r) => r.ticket_id === payload.ticket_id || r.id === payload.id
         );
         if (index !== -1) {
           array[index] = { ...array[index], ...payload };
@@ -42,8 +45,8 @@ const maintenanceSlice = createSlice({
 
       if (
         state.currentRequest &&
-        (state.currentRequest.id === payload.id ||
-          state.currentRequest.request_id === payload.request_id)
+        (state.currentRequest.ticket_id === payload.ticket_id ||
+          state.currentRequest.id === payload.id)
       ) {
         state.currentRequest = { ...state.currentRequest, ...payload };
       }
@@ -51,7 +54,15 @@ const maintenanceSlice = createSlice({
     calculateTotals: (state) => {
       state.totalRequests = state.maintenanceRequests.length;
       state.openRequests = state.maintenanceRequests.filter(
-        (r) => r.status !== "Closed" && r.status !== "Resolved"
+        (r) =>
+          (r.status?.toLowerCase() === 'open' || r.status?.toLowerCase() === 'new') &&
+          r.contractor_assignment?.state !== 'ACCEPTED'
+      ).length;
+      state.inProgressRequests = state.maintenanceRequests.filter(
+        (r) =>
+          r.contractor_assignment?.state === 'ACCEPTED' &&
+          r.status?.toLowerCase() !== 'closed' &&
+          r.status?.toLowerCase() !== 'resolved'
       ).length;
       state.closedRequests = state.maintenanceRequests.filter(
         (r) => r.status === "Closed" || r.status === "Resolved"
@@ -69,20 +80,15 @@ const maintenanceSlice = createSlice({
       })
       .addCase(createMaintenanceRequest.fulfilled, (state, { payload }) => {
         state.loading = false;
-        const newRequest =
-          payload.request || payload.maintenanceRequest || payload;
+        const newRequest = payload.request || payload.maintenanceRequest || payload;
         state.maintenanceRequests.push(newRequest);
         state.totalRequests = state.maintenanceRequests.length;
         state.lastUpdated = new Date().toISOString();
       })
-      .addCase(
-        createMaintenanceRequest.rejected,
-        (state, { payload, error }) => {
-          state.loading = false;
-          state.error =
-            payload || error.message || "Failed to create maintenance request";
-        }
-      )
+      .addCase(createMaintenanceRequest.rejected, (state, { payload, error }) => {
+        state.loading = false;
+        state.error = payload || error.message || "Failed to create maintenance request";
+      })
 
       // Get all maintenance requests
       .addCase(getMaintenanceRequests.pending, (state) => {
@@ -101,29 +107,24 @@ const maintenanceSlice = createSlice({
         ).length;
         state.lastUpdated = new Date().toISOString();
       })
-      .addCase(
-        getMaintenanceRequests.rejected,
-        (state, { payload, error }) => {
-          state.loading = false;
-          state.error =
-            payload || error.message || "Failed to fetch maintenance requests";
-        }
-      )
+      .addCase(getMaintenanceRequests.rejected, (state, { payload, error }) => {
+        state.loading = false;
+        state.error = payload || error.message || "Failed to fetch maintenance requests";
+      })
 
-      // Get maintenance details
+      // ✅ Get maintenance details
       .addCase(getMaintenanceDetails.pending, (state) => {
-        state.loading = true;
+        state.detailsLoading = true;
         state.error = null;
       })
       .addCase(getMaintenanceDetails.fulfilled, (state, { payload }) => {
-        state.loading = false;
+        state.detailsLoading = false;
         state.currentRequest = payload;
         state.lastUpdated = new Date().toISOString();
       })
       .addCase(getMaintenanceDetails.rejected, (state, { payload, error }) => {
-        state.loading = false;
-        state.error =
-          payload || error.message || "Failed to fetch maintenance details";
+        state.detailsLoading = false;
+        state.error = payload || error.message || "Failed to fetch maintenance details";
       })
 
       // Update maintenance status
@@ -133,12 +134,11 @@ const maintenanceSlice = createSlice({
       })
       .addCase(updateMaintenanceStatus.fulfilled, (state, { payload }) => {
         state.loading = false;
-        const updated =
-          payload.request || payload.maintenanceRequest || payload;
+        const updated = payload.request || payload.maintenanceRequest || payload;
 
         const updateInArray = (array) => {
           const index = array.findIndex(
-            (r) => r.id === updated.id || r.request_id === updated.request_id
+            (r) => r.ticket_id === updated.ticket_id || r.id === updated.id
           );
           if (index !== -1) array[index] = { ...array[index], ...updated };
         };
@@ -147,8 +147,8 @@ const maintenanceSlice = createSlice({
 
         if (
           state.currentRequest &&
-          (state.currentRequest.id === updated.id ||
-            state.currentRequest.request_id === updated.request_id)
+          (state.currentRequest.ticket_id === updated.ticket_id ||
+            state.currentRequest.id === updated.id)
         ) {
           state.currentRequest = { ...state.currentRequest, ...updated };
         }
@@ -157,8 +157,40 @@ const maintenanceSlice = createSlice({
       })
       .addCase(updateMaintenanceStatus.rejected, (state, { payload, error }) => {
         state.loading = false;
-        state.error =
-          payload || error.message || "Failed to update maintenance status";
+        state.error = payload || error.message || "Failed to update maintenance status";
+      })
+
+      // ✅ Escalate maintenance request
+      .addCase(escalateMaintenanceRequest.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(escalateMaintenanceRequest.fulfilled, (state, { payload }) => {
+        state.loading = false;
+        const escalated = payload.request || payload.ticket || payload;
+
+        const updateInArray = (array) => {
+          const index = array.findIndex(
+            (r) => r.ticket_id === escalated.ticket_id || r.id === escalated.id
+          );
+          if (index !== -1) array[index] = { ...array[index], ...escalated };
+        };
+
+        updateInArray(state.maintenanceRequests);
+
+        if (
+          state.currentRequest &&
+          (state.currentRequest.ticket_id === escalated.ticket_id ||
+            state.currentRequest.id === escalated.id)
+        ) {
+          state.currentRequest = { ...state.currentRequest, ...escalated };
+        }
+
+        state.lastUpdated = new Date().toISOString();
+      })
+      .addCase(escalateMaintenanceRequest.rejected, (state, { payload, error }) => {
+        state.loading = false;
+        state.error = payload || error.message || "Failed to escalate request";
       });
   },
 });
@@ -177,6 +209,7 @@ const selectMaintenanceState = (state) => state.maintenance || {};
 export const maintenanceSelectors = {
   getMaintenanceData: createSelector([selectMaintenanceState], (maintenanceState) => ({
     loading: maintenanceState.loading || false,
+    detailsLoading: maintenanceState.detailsLoading || false,
     requests: maintenanceState.maintenanceRequests || [],
     currentRequest: maintenanceState.currentRequest,
     totalRequests: maintenanceState.totalRequests || 0,
@@ -184,6 +217,7 @@ export const maintenanceSelectors = {
     closedRequests: maintenanceState.closedRequests || 0,
     lastUpdated: maintenanceState.lastUpdated,
     error: maintenanceState.error,
+    inProgressRequests: maintenanceState.inProgressRequests || 0,
   })),
 
   getAllRequests: createSelector(
@@ -201,6 +235,11 @@ export const maintenanceSelectors = {
     (maintenanceState) => maintenanceState.loading || false
   ),
 
+  isDetailsLoading: createSelector(
+    [selectMaintenanceState],
+    (maintenanceState) => maintenanceState.detailsLoading || false
+  ),
+
   getError: createSelector(
     [selectMaintenanceState],
     (maintenanceState) => maintenanceState.error
@@ -215,5 +254,5 @@ export const maintenanceSelectors = {
   ),
 };
 
-// ✅ Export reducer (only ONE export)
+// ✅ Export reducer
 export default maintenanceSlice.reducer;

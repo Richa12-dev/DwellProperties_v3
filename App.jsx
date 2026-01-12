@@ -11,11 +11,18 @@ import { NavigationContainer } from '@react-navigation/native';
 // import { createStackNavigator } from '@react-navigation/stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+console.log('App.jsx: File loaded');
+
 // Import utilities and components
 import NetworkStatusBanner from './App/src/components/NetworkStatusBanner';
 import { persistor, store } from './App/src/Redux/store';
 import { loginDataSelectors } from './App/src/Redux/Login/loginSlice';
 import { NavigationRef } from './App/src/navigation/RouterServices';
+
+console.log('App.jsx: Imports successful');
+console.log('Store:', store);
+console.log('Persistor:', persistor);
+
 
 // Import all screens
 import Splash from './App/src/screens/Splash/Splash';
@@ -46,7 +53,20 @@ import RentDocuments from './App/src/screens/Payment/RentDocuments';
 import RentHistory from './App/src/screens/Payment/RentHistory';
 import MaintenanceDetails from './App/src/screens/Support/MaintenanceDetails';
 import TenantNotification from './App/src/screens/Notification/TenantNotification';
+import ContractorLogin from './App/src/screens/Login/ContractorLogin';
+import ContractorDashboard from './App/src/screens/Dashboard/ContractorDashboard';
+import Welcome from './App/src/screens/Contractor/Welcome';
+import SelectServices from './App/src/screens/Contractor/SelectServices';
+import UploadDocuments from './App/src/screens/Contractor/UploadDocuments';
+import CongratuationScreen from './App/src/screens/Contractor/CongratuationScreen';
+import ContractorSupport from './App/src/screens/Support/ContractorSupport';
+import ContractorHome from './App/src/navigation/ContractorHome';
+import ContractorPayment from './App/src/screens/Payment/ContractorPayment';
+import PaymentLedger from './App/src/screens/Payment/PaymentLedger';
+import Leaderboard from './App/src/screens/Payment/Leaderboard';
 
+  import ReferralsRewards from './App/src/screens/Payment/ReferralsRewards';
+     
 
 const Stack = createNativeStackNavigator();
 
@@ -101,6 +121,10 @@ const App = () => {
               {/* Bottom Tab Navigators */}
               <Stack.Screen name="ProfileFooter" component={ProfileFooter} />
               <Stack.Screen name="BottomFotter" component={BottomFotter} />
+              <Stack.Screen name="ContractorHome" component={ContractorHome} />
+            <Stack.Screen name = "Welcome"
+                component = {Welcome} />
+                
               
               {/* Other Screens */}
               <Stack.Screen name="Dashboard" component={Dashboard} />
@@ -126,8 +150,29 @@ const App = () => {
                 <Stack.Screen name="MaintenanceDetails" component={MaintenanceDetails} />
                 
                 <Stack.Screen name = "TenantNotification" component= {TenantNotification} />
-
-              
+                
+                <Stack.Screen name = "ContractorLogin"
+                component= {ContractorLogin} />
+                
+                <Stack.Screen name = "ContractorDashboard"
+                component ={ContractorDashboard} />
+            <Stack.Screen name = "SelectServices"
+                component ={SelectServices} />
+           
+                <Stack.Screen name = "UploadDocuments"
+                component ={UploadDocuments} />
+                <Stack.Screen name = "CongratuationScreen"
+                component ={CongratuationScreen} />
+                <Stack.Screen name = "ContractorSupport"
+                component ={ContractorSupport} />
+                <Stack.Screen name = "ContractorPayment"
+                component ={ContractorPayment} />
+                
+                <Stack.Screen name="PaymentLedger" component={PaymentLedger} />
+                <Stack.Screen name="Leaderboard" component={Leaderboard} />
+                <Stack.Screen name="ReferralsRewards" component={ReferralsRewards} />
+                          
+           
             </Stack.Navigator>
           </NavigationContainer>
         </PersistGate>

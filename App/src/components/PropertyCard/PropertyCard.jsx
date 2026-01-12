@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Box, Text, VStack, HStack, Image, Pressable } from 'native-base';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -32,65 +32,96 @@ const PropertyCard = React.memo(
     }, [property]);
 
     const renderPropertyImage = useMemo(() => {
-      try {
-        const img =
-          property?.media?.photos?.[0] ||
-          property?.images?.[0] ||
-          null;
+  try {
+    const image =
+      property?.media?.photos_preview?.[0]?.url ||
+      property?.media?.photos?.[0]?.url ||
+      property?.images?.[0] ||
+      property?.image_urls?.[0] ||
+      null;
 
-        if (typeof img === "string" && img.length > 0) {
-          const uri =
-            img.startsWith("http") ||
-            img.startsWith("data:image")
-              ? img
-              : `data:image/jpeg;base64,${img}`;
+    if (!image) {
+      return (
+        <Image
+          source={require("../../Assets/Image/empty-box.png")}
+          alt="Property"
+          w="100%"
+          h="100%"
+          resizeMode="cover"
+        />
+      );
+    }
 
-          return (
-            <Image
-              source={{ uri }}
-              alt="Property"
-              w="100%"
-              h="100%"
-              resizeMode="cover"
-              fallbackSource={require("../../Assets/Image/empty-box.png")}
-            />
-          );
-        }
-        
-        
+    // DO NOT MODIFY PRESIGNED URL
+    const uri = image.trim();
 
-        return (
-          <Image
-            source={require("../../Assets/Image/empty-box.png")}
-            alt="Property"
-            w="100%"
-            h="100%"
-            resizeMode="cover"
-          />
-        );
-      } catch {
-        return (
-          <Image
-            source={require("../../Assets/Image/empty-box.png")}
-            alt="Property"
-            w="100%"
-            h="100%"
-            resizeMode="cover"
-          />
-        );
-      }
-    }, [property?.media, property?.images]);
+    return (
+      <Image
+        source={{ uri }}
+        alt="Property"
+        w="100%"
+        h="100%"
+        resizeMode="cover"
+        fallbackSource={require("../../Assets/Image/empty-box.png")}
+      />
+    );
+  } catch (error) {
+    return (
+      <Image
+        source={require("../../Assets/Image/empty-box.png")}
+        alt="Property"
+        w="100%"
+        h="100%"
+        resizeMode="cover"
+      />
+    );
+  }
+}, [property?.media, property?.images, property?.image_urls]);
 
-    const propertyId = property?.property_id || property?.id || property?.ID;
+
+    // ✅ FIXED: Get property ID correctly
+    const propertyId = property?.property_id || property?.propertyId || property?.id || property?.ID;
     const propertyType = property?.property_type || "Apartment";
-    
- const isOccupied =
-  property?.availability === "occupied" ||
-  property?.availability_status === "occupied" ||
-  property?.is_available === false;
+        const name = property?.name || "Apartment";
+    name
 
-const status = isOccupied ? "Occupied" : "Vacant";
+    // ✅ FIXED: Better occupation status logic
+    const isOccupied =
+      property?.availability === "occupied" ||
+      property?.availability_status === "occupied" ||
+      property?.is_available === false ||
+      (property?.tenants && Array.isArray(property.tenants) && property.tenants.length > 0);
 
+    const status = isOccupied ? "Occupied" : "Vacant";
+
+    // ✅ FIXED: Handle delete with confirmation
+    const handleDelete = () => {
+      if (!propertyId) {
+        Alert.alert('Error', 'Invalid property ID');
+        return;
+      }
+
+      Alert.alert(
+        'Delete Property',
+        `Are you sure you want to delete "${property?.name || 'this property'}"? This action cannot be undone.`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              console.log('🗑️ Deleting property:', propertyId);
+              // ✅ Pass the entire property object
+              onDelete(property);
+            }
+          }
+        ],
+        { cancelable: true }
+      );
+    };
 
     return (
       <Pressable onPress={() => onViewDetails(property)} mb={4}>
@@ -104,24 +135,35 @@ const status = isOccupied ? "Occupied" : "Vacant";
               {/* FAVORITE BUTTON */}
               <Pressable
                 style={styles.favoriteButton}
-                onPress={() => onToggleFavorite(propertyId)}
+                onPress={(e) => {
+                  // ✅ Prevent card press event
+                  e?.stopPropagation?.();
+                  onToggleFavorite(propertyId);
+                }}
               >
-                <AppIcon
-                  name={isFavorite ? "redHeart" : "heart"}
-                  size={24}
-                  color={isFavorite ? "#E53935" : "#fff"}
-                />
+                {/* ✅ FIXED: Safe icon rendering */}
+                {icons?.redHeart && icons?.heart && (
+                  <AppIcon name={isFavorite ? icons.redHeart : icons.heart} size={24} />
+                )}
               </Pressable>
             </Box>
 
             {/* RIGHT – DETAILS */}
             <VStack style={styles.contentContainer}>
               
-              {/* 🔹 Property Type with Custom AppIcon */}
-              <HStack alignItems="center" justifyContent="space-between">
-             
-                <Text style={styles.propertyType}>{propertyType}</Text>
-    <Box
+              {/* Property Type with Status Badge */}
+           <HStack alignItems="center" justifyContent="space-between">
+  {/* NAME */}
+  <Text
+    style={[styles.propertyType, { flex: 1 }]}
+    numberOfLines={3}
+    ellipsizeMode="tail"
+  >
+    {name}
+  </Text>
+
+  {/* STATUS BADGE */}
+  <Box
     style={[
       styles.statusBadge,
       status === "Occupied" ? styles.occupied : styles.vacant,
@@ -129,8 +171,8 @@ const status = isOccupied ? "Occupied" : "Vacant";
   >
     <Text style={styles.statusText}>{status}</Text>
   </Box>
+</HStack>
 
-              </HStack>
 
               {/* Address */}
               <Text style={styles.address} numberOfLines={1}>
@@ -142,7 +184,9 @@ const status = isOccupied ? "Occupied" : "Vacant";
                 <VStack style={styles.infoItem}>
                   <Text style={styles.infoLabel}>No. Tenant</Text>
                   <Text style={styles.infoValue}>
-                    {property?.tenant_count || "03"}
+                    {property?.tenant_count ||
+                     property?.tenants?.length ||
+                     (isOccupied ? "01" : "00")}
                   </Text>
                 </VStack>
 
@@ -158,22 +202,42 @@ const status = isOccupied ? "Occupied" : "Vacant";
               <HStack style={styles.actionRow}>
                 <TouchableOpacity
                   style={styles.viewDetailsButton}
-                  onPress={() => onViewDetails(property)}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    onViewDetails(property);
+                  }}
                 >
                   <Text style={styles.viewDetailsText}>View Details</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.iconButton} onPress={() => onEdit(property)}>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    onEdit(property);
+                  }}
+                >
+                  {/* ✅ FIXED: Safe icon rendering */}
+                  {icons?.editIcon ? (
                     <AppIcon name={icons.editIcon} size={24} />
+                  ) : (
+                    <MaterialIcons name="edit" size={24} color="#666" />
+                  )}
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.iconButton}
-                  onPress={() => onDelete(propertyId)}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    handleDelete();
+                  }}
                 >
-                
-                <AppIcon name={icons.deleteIcon} size={24} />
-                 
+                  {/* ✅ FIXED: Safe icon rendering with fallback */}
+                  {icons?.deleteIcon ? (
+                    <AppIcon name={icons.deleteIcon} size={24} />
+                  ) : (
+                    <MaterialIcons name="delete" size={24} color="#E53935" />
+                  )}
                 </TouchableOpacity>
               </HStack>
 
@@ -216,34 +280,31 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    padding: 16,
+    padding: 10,
     justifyContent: "space-between",
   },
   propertyType: {
     fontSize: 18,
     fontWeight: "700",
     color: "#1a1a1a",
-  },
+    marginRight: 8,
+      },
   statusBadge: {
-  paddingHorizontal: 10,
-  paddingVertical: 4,
-  borderRadius: 12,
-},
-
-occupied: {
-  backgroundColor: "#E53935", // red
-},
-
-vacant: {
-  backgroundColor: "#4CAF50", // green
-},
-
-statusText: {
-  color: "white",
-  fontSize: 12,
-  fontWeight: "600",
-},
-
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  occupied: {
+    backgroundColor: "#E53935",
+  },
+  vacant: {
+    backgroundColor: "#4CAF50",
+  },
+  statusText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   address: {
     fontSize: 12,
     color: "#666",
@@ -277,8 +338,8 @@ statusText: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-  alignItems: "center",
-  justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
   viewDetailsText: {
     color: "white",

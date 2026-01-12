@@ -50,7 +50,7 @@ const Login = ({ navigation }) => {
   };
 
   const handleContractorLogin = () => {
-    navigation.navigate('TenantLogin', { userType: 'contractor' });
+    navigation.navigate('ContractorLogin', { userType: 'contractor' });
   };
 
 

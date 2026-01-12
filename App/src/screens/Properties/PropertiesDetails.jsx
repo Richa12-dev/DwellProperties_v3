@@ -11,72 +11,75 @@ import {
   Platform,
   StatusBar,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 
 import MaterialIcon from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import Swiper from "react-native-swiper";
+import { useSelector, useDispatch } from "react-redux";
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from "react-native-responsive-screen";
+import Toast from "react-native-simple-toast";
 
 import { AppIcon } from "../../components/AppIcon";
 import { icons } from "../../Assets";
 import Container from "../../components/Container/Container";
 import { openLocationInMaps } from "../../Redux/Properties/services";
-import { useSelector } from "react-redux";
-import {
-  heightPercentageToDP as hp,
-  widthPercentageToDP as wp,
-} from "react-native-responsive-screen";
 import { loginDataSelectors } from "../../Redux/Login/loginSlice";
-import Toast from "react-native-simple-toast";
+import { propertiesSelectors, clearCurrentTenant } from "../../Redux/Properties/propertiesSlice";
+import { getTenantById } from "../../Redux/Properties/services";
 
 const { width: screenWidth } = Dimensions.get("window");
 
-// Dummy data for fallback when no tenant is assigned
-const DUMMY_DATA = {
-  name: "Blue Bell Apartment",
-  address: "909-1/2 E 49th LA",
-  city: "CA",
-  state: "California",
-  zip_code: "90011",
-  property_type: "Apartment",
-  bedrooms: 2,
-  bathrooms: 1,
-  square_footage: 2000,
-  year_built: 2018,
-  is_available: false,
-  monthly_rent: 2600,
-  description: "Spacious 2BHK apartment with modern interiors, ample natural light, and a private balcony. Located in a prime neighborhood close to schools, markets, and public transport.",
-  amenities: ["Air Conditioning", "Built in Wardrobes", "Smart Lighting", "Secure Covered Parking"],
-  rented_since: "11 Aug, 2024",
-};
-
 const PropertiesDetails = ({ route, navigation }) => {
-  const propertyData = route?.params?.property || DUMMY_DATA;
-  
-  // Merge with dummy data for missing fields
-  const property = {
-    ...DUMMY_DATA,
-    ...propertyData,
-    amenities: propertyData.amenities?.length > 0 ? propertyData.amenities : DUMMY_DATA.amenities,
-  };
+  const dispatch = useDispatch();
+  const property = route?.params?.property;
   
   const { userData } = useSelector(loginDataSelectors.getLoginStatus);
   const accessToken = useSelector(loginDataSelectors.getAccessToken);
-
-  const [tenantData, setTenantData] = useState(null);
-  const [loadingTenant, setLoadingTenant] = useState(false);
+  const currentTenant = useSelector(propertiesSelectors.getCurrentTenant);
+  const tenantLoading = useSelector(propertiesSelectors.isTenantLoading);
 
   const contactEmail = userData?.email || null;
   const contactPhone = userData?.phoneNumber || null;
 
-  // Fetch tenant data if property has tenant_id
+  // ✅ Debug logging to see what we receive
   useEffect(() => {
-    const fetchTenantData = async () => {
-      // Check if property has a tenant assigned
-      const tenantId = property.tenant_id || property.current_tenant_id;
+    if (property) {
+      console.log('🏠 Property Details Loaded:', {
+        property_id: property.property_id,
+        name: property.name,
+        has_image_urls: !!property.image_urls,
+        image_urls_length: property.image_urls?.length,
+        has_images: !!property.images,
+        images_length: property.images?.length,
+        has_media: !!property.media,
+        media_photos_length: property.media?.photos?.length,
+        media_preview_length: property.media?.photos_preview?.length,
+      });
       
-      if (!tenantId || property.is_available) {
-        setTenantData(null);
+      // Log the actual image data
+      console.log('📸 Image URLs:', property.image_urls);
+      console.log('📸 Images:', property.images);
+      console.log('📸 Media:', property.media);
+    }
+  }, [property]);
+
+  // ✅ Fetch tenant data using Redux action
+  useEffect(() => {
+    // Clear previous tenant data when component mounts
+    dispatch(clearCurrentTenant());
+
+    const fetchTenantData = async () => {
+      // Check if property has tenants assigned
+      const hasAssignedTenant = property?.tenants &&
+                                 Array.isArray(property.tenants) &&
+                                 property.tenants.length > 0;
+
+      if (!hasAssignedTenant || property?.availability === 'available') {
         return;
       }
 
@@ -85,104 +88,177 @@ const PropertiesDetails = ({ route, navigation }) => {
         return;
       }
 
-      setLoadingTenant(true);
-      
-      try {
-        // Replace with your actual tenant API endpoint
-        const TENANT_API_URL = 'https://70q2ntiu1f.execute-api.us-east-1.amazonaws.com/prod/tenants';
-        
-        const response = await fetch(`${TENANT_API_URL}/${tenantId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        });
+      // Get first tenant's email or ID
+      const firstTenant = property.tenants[0];
+      const tenantIdentifier = firstTenant.email || firstTenant.id || firstTenant.tenant_id;
 
-        if (response.ok) {
-          const data = await response.json();
-          
-          // Handle different response structures
-          const tenant = data.tenant || data.item || data.data || data;
-          
-          setTenantData({
-            id: tenant.tenant_id || tenant.id || tenantId,
-            name: `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || tenant.name || 'Unknown Tenant',
-            email: tenant.email || null,
-            phone: tenant.phoneNumber || tenant.phone || null,
-            avatar: tenant.avatar || tenant.profileImage || null,
-            house_no: property.unit_number || property.house_no || 'N/A',
-            lease_start: tenant.lease_start_date || property.rental_start_date || null,
-            lease_end: tenant.lease_end_date || property.rental_end_date || null,
-          });
-        } else {
-          console.log('Failed to fetch tenant data:', response.status);
-          
-          // Fallback: Use basic info from property
-          setTenantData({
-            id: tenantId,
-            name: property.tenant_name || 'Tenant',
-            email: property.tenant_email || null,
-            phone: property.tenant_phone || null,
-            avatar: null,
-            house_no: property.unit_number || property.house_no || 'N/A',
-            lease_start: property.rental_start_date || null,
-            lease_end: property.rental_end_date || null,
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching tenant data:', error);
-        
-        // Fallback: Use basic info from property
-        setTenantData({
-          id: tenantId,
-          name: property.tenant_name || 'Tenant',
-          email: property.tenant_email || null,
-          phone: property.tenant_phone || null,
-          avatar: null,
-          house_no: property.unit_number || property.house_no || 'N/A',
-          lease_start: property.rental_start_date || null,
-          lease_end: property.rental_end_date || null,
-        });
-      } finally {
-        setLoadingTenant(false);
+      if (tenantIdentifier) {
+        console.log('🔍 Fetching tenant data for:', tenantIdentifier);
+        dispatch(getTenantById({
+          tenantId: tenantIdentifier,
+          token: accessToken
+        }));
       }
     };
 
-    fetchTenantData();
-  }, [property.tenant_id, property.current_tenant_id, property.is_available, accessToken]);
+    if (property) {
+      fetchTenantData();
+    }
 
-  const status = property.is_available
+    return () => {
+      dispatch(clearCurrentTenant());
+    };
+  }, [property?.property_id, property?.tenants, property?.availability, accessToken, dispatch]);
+
+  // ✅ Debug logging to see what we receive
+  useEffect(() => {
+    if (property) {
+      console.log('🏠 Property Details Loaded:', {
+        property_id: property.property_id,
+        name: property.name,
+        has_image_urls: !!property.image_urls,
+        image_urls_length: property.image_urls?.length,
+        has_images: !!property.images,
+        images_length: property.images?.length,
+        has_media: !!property.media,
+        media_photos_length: property.media?.photos?.length,
+        media_photos_expanded_length: property.media?.photos_expanded?.length,
+      });
+      
+      // Log the actual image data
+      console.log('📸 Image URLs:', property.image_urls);
+      console.log('📸 Images:', property.images);
+      console.log('📸 Media:', property.media);
+      console.log('📸 Media Photos Expanded:', property.media?.photos_expanded);
+    }
+  }, [property]);
+
+  // ✅ Fixed image source handler - handles all formats including S3 keys
+  const getImageSource = (img) => {
+    if (!img) {
+      return require("../../Assets/Image/empty-box.png");
+    }
+
+    // If it's already a require statement or local asset
+    if (typeof img === 'number') {
+      return img;
+    }
+
+    // If it's a string
+    if (typeof img === "string") {
+      const cleanUrl = img.trim();
+      
+      // If it's a full HTTP/HTTPS URL (including pre-signed S3 URLs)
+      if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) {
+        return { uri: cleanUrl };
+      }
+      
+      // If it's a base64 data URI
+      if (cleanUrl.startsWith("data:image")) {
+        return { uri: cleanUrl };
+      }
+      
+      // ✅ NEW: If it looks like an S3 key (contains forward slashes but no http)
+      if (cleanUrl.includes("/") && !cleanUrl.startsWith("http")) {
+        console.log('🔧 Converting S3 key to full URL:', cleanUrl);
+        return { uri: `https://dp-properties.s3.amazonaws.com/${cleanUrl}` };
+      }
+      
+      // If it's a base64 string without prefix
+      if (cleanUrl.length > 100 && !cleanUrl.includes("/") && !cleanUrl.includes(".")) {
+        return { uri: `data:image/jpeg;base64,${cleanUrl}` };
+      }
+      
+      // Otherwise treat as URL
+      return { uri: cleanUrl };
+    }
+
+    // If it's an object with uri property
+    if (img?.uri) {
+      return { uri: img.uri };
+    }
+
+    // If it's an object with base64 property
+    if (img?.base64) {
+      return { uri: `data:image/jpeg;base64,${img.base64}` };
+    }
+
+    // ✅ CRITICAL FIX: If it's an object with url property (from API media.photos_expanded/preview)
+    if (img?.url) {
+      return { uri: img.url };
+    }
+
+    // ✅ NEW: If it's an object with key property, build full S3 URL
+    if (img?.key) {
+      console.log('🔧 Converting S3 key object to full URL:', img.key);
+      return { uri: `https://dp-properties.s3.amazonaws.com/${img.key}` };
+    }
+
+    // Fallback
+    return require("../../Assets/Image/empty-box.png");
+  };
+
+  // ✅ FIXED: Get property images - check photos_preview FIRST since PropertyCard works with it
+  const getPropertyImages = () => {
+    // ✅ PRIORITY 1: Check media.photos_preview (PropertyCard uses this successfully!)
+    if (property?.media?.photos_preview && Array.isArray(property.media.photos_preview) && property.media.photos_preview.length > 0) {
+      console.log('✅ Found images in media.photos_preview:', property.media.photos_preview.length);
+      console.log('📸 First preview image:', property.media.photos_preview[0]);
+      return property.media.photos_preview;
+    }
+
+    // Priority 2: Check media.photos_expanded
+    if (property?.media?.photos_expanded && Array.isArray(property.media.photos_expanded) && property.media.photos_expanded.length > 0) {
+      console.log('✅ Found images in media.photos_expanded:', property.media.photos_expanded.length);
+      return property.media.photos_expanded;
+    }
+
+    // Priority 3: Check image_urls
+    if (property?.image_urls && Array.isArray(property.image_urls) && property.image_urls.length > 0) {
+      console.log('✅ Found images in image_urls:', property.image_urls.length);
+      return property.image_urls;
+    }
+
+    // Priority 4: Check images
+    if (property?.images && Array.isArray(property.images) && property.images.length > 0) {
+      console.log('✅ Found images in images:', property.images.length);
+      return property.images;
+    }
+
+    // Priority 5: Check media.photos and convert S3 keys to full URLs
+    if (property?.media?.photos && Array.isArray(property.media.photos) && property.media.photos.length > 0) {
+      console.log('⚠️ Found S3 keys in media.photos, building full URLs:', property.media.photos.length);
+      // Convert S3 keys to full URLs
+      return property.media.photos.map(photoKey => ({
+        key: photoKey,
+        url: `https://dp-properties.s3.amazonaws.com/${photoKey}`
+      }));
+    }
+
+    console.log('❌ No images found in property');
+    return [];
+  };
+
+  const propertyImages = getPropertyImages();
+
+  const status = property?.availability === 'available'
     ? { label: "Available", color: "#16A34A" }
     : { label: "Occupied", color: "#DC2626" };
 
   const formatAddress = () => {
     const parts = [];
-    if (property.address) parts.push(property.address);
-    if (property.city) parts.push(property.city);
-    if (property.state) parts.push(property.state);
-    if (property.zip_code) parts.push(property.zip_code);
+    if (property?.street) parts.push(property.street);
+    if (property?.city) parts.push(property.city);
+    if (property?.state) parts.push(property.state);
+    if (property?.zipcode) parts.push(property.zipcode);
     return parts.join(", ");
-  };
-
-  const getImageSource = (img) => {
-    if (typeof img === "string") {
-      return {
-        uri: img.startsWith("data:image")
-          ? img
-          : `data:image/jpeg;base64,${img}`,
-      };
-    }
-    if (img?.uri) return { uri: img.uri };
-    if (img?.base64) return { uri: `data:image/jpeg;base64,${img.base64}` };
-    return require("../../Assets/Image/empty-box.png");
   };
 
   const handleCallTenant = (phone) => {
     if (phone) {
-      // Implement call functionality
-      Toast.show(`Calling ${phone}`);
+      Linking.openURL(`tel:${phone}`).catch(() => {
+        Toast.show('Unable to make call');
+      });
     } else {
       Toast.show('Phone number not available');
     }
@@ -190,17 +266,44 @@ const PropertiesDetails = ({ route, navigation }) => {
 
   const handleEmailTenant = (email) => {
     if (email) {
-      // Implement email functionality
-      Toast.show(`Emailing ${email}`);
+      Linking.openURL(`mailto:${email}`).catch(() => {
+        Toast.show('Unable to open email');
+      });
     } else {
       Toast.show('Email not available');
     }
+  };
+
+  // ✅ Extract area value from string (e.g., "2000 sqft" -> "2000")
+  const getAreaValue = () => {
+    if (!property?.area) return "N/A";
+    if (typeof property.area === 'number') return property.area.toLocaleString();
+    
+    // Extract number from string like "2000 sqft"
+    const match = String(property.area).match(/\d+/);
+    return match ? parseInt(match[0]).toLocaleString() : property.area;
   };
 
   const navbarHeight =
     Platform.OS === "android"
       ? StatusBar.currentHeight + hp(9) + hp(2)
       : hp(7) + hp(9) + hp(2);
+
+  if (!property) {
+    return (
+      <Container style={{ marginTop: -navbarHeight }}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Property not found</Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </Container>
+    );
+  }
 
   return (
     <Container style={{ marginTop: -navbarHeight }}>
@@ -209,36 +312,79 @@ const PropertiesDetails = ({ route, navigation }) => {
           {/* IMAGE GALLERY */}
           <View style={{ position: "relative" }}>
             <View style={{ height: 350, backgroundColor: "#E5E7EB" }}>
-              {property.images?.length > 0 ? (
+              {propertyImages.length > 0 ? (
                 <Swiper
-                  autoplay={property.images.length > 1}
+                  autoplay={propertyImages.length > 1}
+                  autoplayTimeout={3}
                   showsPagination
                   paginationStyle={{ bottom: 10 }}
                   dotStyle={{ backgroundColor: "rgba(255,255,255,0.5)" }}
                   activeDotStyle={{ backgroundColor: "#fff" }}
                 >
-                  {property.images.map((img, idx) => (
-                    <Image
-                      key={idx}
-                      source={getImageSource(img)}
-                      style={{ width: screenWidth, height: "100%" }}
-                      resizeMode="cover"
-                    />
-                  ))}
+                  {propertyImages.map((img, idx) => {
+                    // ✅ Extract URL - handle both object {url: "..."} and string formats
+                    let imageUri = null;
+                    
+                    if (typeof img === 'object' && img !== null) {
+                     
+                      imageUri = img.url || img.uri || img.key;
+                    } else if (typeof img === 'string') {
+                      // String format
+                      imageUri = img;
+                    }
+
+                    // If no valid URI found, skip this image
+                    if (!imageUri) {
+                      console.log('⚠️ No valid URI found for image index', idx, img);
+                      return null;
+                    }
+
+                    // Build full URL if it's just an S3 key
+                    if (!imageUri.startsWith('http') && imageUri.includes('/')) {
+                      imageUri = `https://dp-properties.s3.amazonaws.com/${imageUri}`;
+                    }
+
+                    console.log(`🖼️ Rendering image ${idx}:`, imageUri.substring(0, 100) + '...');
+                    
+                    return (
+                      <View key={idx} style={{ flex: 1 }}>
+                        <Image
+                          source={{ uri: imageUri }}
+                          style={{ width: screenWidth, height: "100%" }}
+                          resizeMode="cover"
+                          onError={(e) => {
+                            console.log('❌ Image load error for index', idx);
+                            console.log('Error:', e.nativeEvent.error);
+                            console.log('Image URI (first 150 chars):', imageUri?.substring(0, 150));
+                            console.log('Original image data:', img);
+                          }}
+                          onLoad={() => {
+                            console.log('✅ Image loaded successfully for index', idx);
+                          }}
+                          onLoadStart={() => {
+                            console.log('⏳ Started loading image', idx);
+                          }}
+                        />
+                      </View>
+                    );
+                  })}
                 </Swiper>
               ) : (
-                <Image
-                  source={require("../../Assets/Image/empty-box.png")}
-                  style={{ width: screenWidth, height: "100%" }}
-                  resizeMode="cover"
-                />
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <Image
+                    source={require("../../Assets/Image/empty-box.png")}
+                    style={{ width: 200, height: 200 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={{ marginTop: 10, color: '#6B7280' }}>No images available</Text>
+                </View>
               )}
             </View>
 
-            {property.images?.length > 0 && (
+            {propertyImages.length > 0 && (
               <View style={styles.photoCount}>
                 <Text style={styles.photoCountText}>
-                  {property.images.length} Photos
+                  {propertyImages.length} Photo{propertyImages.length !== 1 ? 's' : ''}
                 </Text>
               </View>
             )}
@@ -257,21 +403,25 @@ const PropertiesDetails = ({ route, navigation }) => {
             <View style={styles.topRow}>
               <View style={styles.leftBlock}>
                 <Text style={styles.propertyName}>{property.name}</Text>
-                {property.address ? (
+                {formatAddress() ? (
                   <TouchableOpacity
                     onPress={() => openLocationInMaps(property)}
                     style={styles.locationRow}
                   >
-                                  <AppIcon name={icons.heart} size={wp(6)} />
+                  <View style={{ flexDirection: 'row' }}>
+                <AppIcon name={icons.location} size={wp(5)} />
                     <Text style={styles.propertyAddress}>
                       {formatAddress()}
                     </Text>
+                    </View>
                   </TouchableOpacity>
                 ) : null}
               </View>
 
               <View style={styles.rightBlock}>
-                <Text style={styles.propertyType}>{property.property_type}</Text>
+                <Text style={styles.propertyType}>
+                  {property.property_type || 'Apartment'}
+                </Text>
               </View>
             </View>
           </View>
@@ -294,11 +444,7 @@ const PropertiesDetails = ({ route, navigation }) => {
               <View style={styles.divider} />
 
               <View style={styles.statCol}>
-                <Text style={styles.statValue}>
-                  {property.square_footage
-                    ? `${property.square_footage.toLocaleString()}`
-                    : "N/A"}
-                </Text>
+                <Text style={styles.statValue}>{getAreaValue()}</Text>
                 <Text style={styles.statLabel}>sq. ft.</Text>
               </View>
             </View>
@@ -310,26 +456,36 @@ const PropertiesDetails = ({ route, navigation }) => {
               </View>
 
               <View style={styles.infoCol}>
-                <Text style={styles.infoValue}>{property.rented_since || "N/A"}</Text>
-                <Text style={styles.infoLabel}>Rented Since</Text>
+                <Text style={styles.infoValue}>
+                  {property.created_at
+                    ? new Date(property.created_at).toLocaleDateString('en-US', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      })
+                    : "N/A"}
+                </Text>
+                <Text style={styles.infoLabel}>Added On</Text>
               </View>
 
               <View style={styles.infoCol}>
-                <Text style={styles.infoValue}>{status.label}</Text>
+                <Text style={[styles.infoValue, { color: status.color }]}>
+                  {status.label}
+                </Text>
                 <Text style={styles.infoLabel}>Status</Text>
               </View>
             </View>
           </View>
 
           {/* DESCRIPTION */}
-          <View style={styles.glassCard}>
-            <Text style={styles.sectionTitle}>Properties Details</Text>
-            {property.description ? (
+          {property.description && (
+            <View style={styles.glassCard}>
+              <Text style={styles.sectionTitle}>Property Details</Text>
               <View style={{ marginTop: 10 }}>
                 <Text style={styles.descText}>{property.description}</Text>
               </View>
-            ) : null}
-          </View>
+            </View>
+          )}
 
           {/* AMENITIES */}
           {property.amenities?.length > 0 && (
@@ -339,7 +495,7 @@ const PropertiesDetails = ({ route, navigation }) => {
                 {property.amenities.map((amenity, i) => (
                   <View key={i} style={styles.amenityItem}>
                     <View style={styles.amenityIconBox}>
-                      <Ionicons
+                      <AppIcon
                         name={getAmenityIcon(amenity)}
                         size={20}
                         color="#EF4444"
@@ -352,59 +508,55 @@ const PropertiesDetails = ({ route, navigation }) => {
             </View>
           )}
 
-          {/* TENANT LIST - Now showing actual tenant data */}
-          {!property.is_available && (
+          {/* TENANT INFORMATION - Using Redux state */}
+          {property.availability !== 'available' && property.tenants?.length > 0 && (
             <View style={styles.glassCard}>
               <Text style={styles.sectionTitle}>Tenant Information</Text>
 
-              {loadingTenant ? (
+              {tenantLoading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color="#EF4444" />
                   <Text style={styles.loadingText}>Loading tenant information...</Text>
                 </View>
-              ) : tenantData ? (
+              ) : currentTenant ? (
                 <View style={styles.tenantRow}>
                   <View style={styles.tenantLeft}>
                     <View style={styles.tenantAvatar}>
-                      {tenantData.avatar ? (
+                      {currentTenant.avatar ? (
                         <Image
-                          source={{ uri: tenantData.avatar }}
+                          source={{ uri: currentTenant.avatar }}
                           style={styles.avatarImage}
                         />
                       ) : (
                         <Text style={styles.avatarText}>
-                          {tenantData.name?.charAt(0)?.toUpperCase() || "T"}
+                          {currentTenant.name?.charAt(0)?.toUpperCase() || "T"}
                         </Text>
                       )}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.tenantName}>{tenantData.name}</Text>
-                      <Text style={styles.tenantHouse}>
-                        {tenantData.house_no !== 'N/A'
-                          ? `House No-${tenantData.house_no}, Tenant`
-                          : 'Current Tenant'}
-                      </Text>
-                      {tenantData.lease_start && (
+                      <Text style={styles.tenantName}>{currentTenant.name}</Text>
+                      <Text style={styles.tenantHouse}>Current Tenant</Text>
+                      {currentTenant.lease_start && (
                         <Text style={styles.tenantLease}>
-                          Lease: {new Date(tenantData.lease_start).toLocaleDateString()}
-                          {tenantData.lease_end && ` - ${new Date(tenantData.lease_end).toLocaleDateString()}`}
+                          Lease: {new Date(currentTenant.lease_start).toLocaleDateString()}
+                          {currentTenant.lease_end && ` - ${new Date(currentTenant.lease_end).toLocaleDateString()}`}
                         </Text>
                       )}
                     </View>
                   </View>
                   <View style={styles.tenantActions}>
-                    {tenantData.phone && (
+                    {currentTenant.phone && (
                       <TouchableOpacity
                         style={styles.iconButton}
-                        onPress={() => handleCallTenant(tenantData.phone)}
+                        onPress={() => handleCallTenant(currentTenant.phone)}
                       >
                         <Ionicons name="call-outline" size={18} color="#111827" />
                       </TouchableOpacity>
                     )}
-                    {tenantData.email && (
+                    {currentTenant.email && (
                       <TouchableOpacity
                         style={styles.iconButton}
-                        onPress={() => handleEmailTenant(tenantData.email)}
+                        onPress={() => handleEmailTenant(currentTenant.email)}
                       >
                         <Ionicons name="mail-outline" size={18} color="#111827" />
                       </TouchableOpacity>
@@ -412,11 +564,35 @@ const PropertiesDetails = ({ route, navigation }) => {
                   </View>
                 </View>
               ) : (
-                <View style={styles.noTenantContainer}>
-                  <Ionicons name="person-outline" size={40} color="#9CA3AF" />
-                  <Text style={styles.noTenantText}>
-                    No tenant information available
-                  </Text>
+                <View style={styles.tenantRow}>
+                  <View style={styles.tenantLeft}>
+                    <View style={styles.tenantAvatar}>
+                      <Text style={styles.avatarText}>
+                        {property.tenants[0]?.name?.charAt(0)?.toUpperCase() || "T"}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.tenantName}>
+                        {property.tenants[0]?.name || 'Tenant'}
+                      </Text>
+                      <Text style={styles.tenantHouse}>Current Tenant</Text>
+                      {property.tenants[0]?.email && (
+                        <Text style={styles.tenantLease}>
+                          {property.tenants[0].email}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.tenantActions}>
+                    {property.tenants[0]?.email && (
+                      <TouchableOpacity
+                        style={styles.iconButton}
+                        onPress={() => handleEmailTenant(property.tenants[0].email)}
+                      >
+                        <Ionicons name="mail-outline" size={18} color="#111827" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               )}
             </View>
@@ -468,7 +644,7 @@ const PropertiesDetails = ({ route, navigation }) => {
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }}>
               <View>
                 <Text style={styles.rentPrice}>
-                  ${property.monthly_rent?.toLocaleString() || "2600"}/month
+                  ${property.monthly_rent?.toLocaleString() || "0"}/month
                 </Text>
                 <Text style={styles.utilitiesText}>+ Utilities Bill</Text>
               </View>
@@ -485,17 +661,56 @@ const PropertiesDetails = ({ route, navigation }) => {
 
 // Helper function to get amenity icons
 const getAmenityIcon = (amenity) => {
-  const amenityLower = amenity.toLowerCase();
-  if (amenityLower.includes("air") || amenityLower.includes("conditioning")) return "snow-outline";
-  if (amenityLower.includes("wardrobe")) return "bed-outline";
-  if (amenityLower.includes("light")) return "bulb-outline";
-  if (amenityLower.includes("parking") || amenityLower.includes("car")) return "car-outline";
-  return "checkmark-circle-outline";
+  const amenityLower = amenity.toLowerCase().trim();
+  
+  // Exact or close matches first
+  if (amenityLower === "furnished") return icons.furnished;
+  if (amenityLower === "parking") return icons.parking;
+  if (amenityLower === "elevator") return icons.elevator;
+  if (amenityLower === "ac" || amenityLower.includes("air") || amenityLower.includes("conditioning")) return icons.hvac;
+  if (amenityLower === "gym" || amenityLower.includes("fitness")) return icons.furnished;
+  if (amenityLower === "pool" || amenityLower.includes("swimming")) return icons.cleaning;
+  if (amenityLower.includes("appliances")) return icons.appliances;
+  if (amenityLower.includes("landscaping") || amenityLower.includes("garden")) return icons.landscaping;
+  if (amenityLower.includes("wardrobe") || amenityLower.includes("closet")) return icons.furnished;
+  if (amenityLower.includes("wifi") || amenityLower.includes("internet")) return icons.electrical;
+  if (amenityLower.includes("light") || amenityLower.includes("electrical")) return icons.electrical;
+  if (amenityLower.includes("paint")) return icons.painting;
+  if (amenityLower.includes("hvac") || amenityLower.includes("heating")) return icons.hvac;
+  if (amenityLower.includes("plumb")) return icons.plumbing;
+  if (amenityLower.includes("carpentry") || amenityLower.includes("wood")) return icons.carpentry;
+  if (amenityLower.includes("clean")) return icons.cleaning;
+  
+  // Default fallback
+  return icons.furnished;
 };
+
 
 export default PropertiesDetails;
 
 const styles = StyleSheet.create({
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: "#6B7280",
+    marginBottom: 20,
+  },
+  backButton: {
+    backgroundColor: "#EF4444",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   glassCard: {
     backgroundColor: "rgba(255, 255, 255, 0.7)",
     borderRadius: 16,
@@ -538,6 +753,7 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     maxWidth: "93%",
     lineHeight: 18,
+    marginLeft: 4,
   },
   rightBlock: {
     paddingHorizontal: 12,
@@ -551,8 +767,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#fff",
+    textTransform: "capitalize",
   },
-  backBtn: {
+   backBtn: {
     position: "absolute",
     left: 16,
     top: "50%",
@@ -578,7 +795,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowOffset: { width: 0, height: 2 },
   },
-  photoCount: {
+    photoCount: {
     position: "absolute",
     bottom: 8,
     left: 8,
@@ -705,8 +922,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(229, 231, 235, 0.5)",
   },
   tenantLeft: {
     flexDirection: "row",
@@ -760,16 +975,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(229, 231, 235, 0.5)",
-  },
-  noTenantContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 30,
-  },
-  noTenantText: {
-    fontSize: 14,
-    color: "#9CA3AF",
-    marginTop: 10,
   },
   infoRowLine: {
     flexDirection: "row",

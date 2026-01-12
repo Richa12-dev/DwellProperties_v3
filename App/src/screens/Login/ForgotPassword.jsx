@@ -17,6 +17,8 @@ import FlashMessage, { showMessage } from 'react-native-flash-message';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { TextInput } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { icons } from '../../Assets';
+import { AppIcon } from '../../components/AppIcon';
 
 import CustomButton from '../../components/CustomButton';
 import { Colors } from '../../Theme';
@@ -146,7 +148,7 @@ const ForgotPassword = ({ navigation }) => {
                             style={styles.backButton}
                             onPress={() => navigation.navigate('Login')}
                         >
-                            <Icon name="arrow-back" size={24} color="#1F2D3D" />
+                        <AppIcon name={icons.arrowBack} size={24} />
                         </TouchableOpacity>
 
                         {/* Logo */}

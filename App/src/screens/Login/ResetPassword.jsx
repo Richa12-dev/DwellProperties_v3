@@ -23,6 +23,8 @@ import { getFontFamily } from '../../utils';
 import { confirmForgotPassword } from '../../Redux/Login/services';
 import { loginDataSelectors } from '../../Redux/Login/loginSlice';
 import { useDispatch, useSelector } from 'react-redux';
+import {AppIcon} from '../../components/AppIcon';
+import { icons } from '../../Assets';
 
 const ResetPassword = ({ navigation, route }) => {
     const { email } = route.params || {};
@@ -106,7 +108,7 @@ const ResetPassword = ({ navigation, route }) => {
                             style={styles.backButton}
                             onPress={() => navigation.goBack()}
                         >
-                            <Icon name="arrow-back" size={24} color="#1F2D3D" />
+                    <AppIcon name={icons.arrowBack} size={24} />
                         </TouchableOpacity>
 
                         {/* Heading */}
@@ -145,7 +147,15 @@ const ResetPassword = ({ navigation, route }) => {
                                 theme={{ roundness: 8 }}
                                 right={
                                     <TextInput.Icon
-                                        icon={showNewPassword ? 'eye-off' : 'eye'}
+                                    
+                                icon={() => (
+                      <AppIcon
+                        name={showNewPassword ? icons.eye : icons.eyeSlash}
+                        height={hp(2.3)}
+                        width={hp(2.3)}
+                      />
+                    )}
+                    
                                         onPress={() => setShowNewPassword(!showNewPassword)}
                                         forceTextInputFocus={false}
                                     />
@@ -165,7 +175,14 @@ const ResetPassword = ({ navigation, route }) => {
                                 theme={{ roundness: 8 }}
                                 right={
                                     <TextInput.Icon
-                                        icon={showConfirmPassword ? 'eye-off' : 'eye'}
+                                                                      icon={() => (
+                      <AppIcon
+                        name={showNewPassword ? icons.eye : icons.eyeSlash}
+                        height={hp(2.3)}
+                        width={hp(2.3)}
+                      />
+                    )}
+
                                         onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                                         forceTextInputFocus={false}
                                     />

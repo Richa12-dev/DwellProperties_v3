@@ -173,11 +173,11 @@ locations={[0.3453, 0.7113]}
   right={
     <TextInput.Icon
       icon={() => (
-        <Icon
-          name={hidePassword ? 'visibility-off' : 'visibility'}
-          size={22}
-          color="#838383"
-        />
+         <AppIcon
+        name={hidePassword ? icons.eye : icons.eyeSlash}
+        height={hp(2.3)}
+        width={hp(2.3)}
+      />
       )}
       onPress={togglePasswordVisibility}
       forceTextInputFocus={false}

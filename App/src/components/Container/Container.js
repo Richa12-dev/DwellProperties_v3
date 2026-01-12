@@ -6,6 +6,7 @@ import {
   Animated,
   StatusBar,
   Platform,
+  ImageBackground
 } from "react-native";
 import { Colors } from "../../Theme";
 import {
@@ -13,13 +14,18 @@ import {
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import CollectionNavBar from "../CollectionNavBar/CollectionNavBar";
+import { getFontFamily } from '../../utils';
+import { AppIcon } from "../../components/AppIcon";
+import { icons } from "../../Assets";
+
 
 type ContainerProps = Readonly<{
   children: React.ReactNode;
   style?: object;
+  scroll?: boolean;
 }>;
 
-const Container = ({ children, style }: ContainerProps) => {
+const Container = ({ children, style, scroll = true }: ContainerProps) => {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const onScroll = Animated.event(
@@ -31,27 +37,41 @@ const Container = ({ children, style }: ContainerProps) => {
     <View style={styles.mainContainer}>
       <StatusBar backgroundColor={Colors.black} barStyle="light-content" />
 
-      {/* 🔴 Background Glow */}
-      <View style={styles.backgroundContainer}>
-        <View style={styles.topGlow} />
-        <View style={styles.bottomGlow} />
+      {/* Background Glow Layer */}
+      <View style={styles.backgroundContainer} pointerEvents="none">
+        <ImageBackground
+          source={require('../../Assets/Image/dwellProperties/topGlow.png')}
+          style={styles.topGlow}
+          resizeMode="contain"
+        />
+        <ImageBackground
+          source={require('../../Assets/Image/dwellProperties/bottomGlow.png')}
+          style={styles.bottomGlow}
+          resizeMode="contain"
+        />
       </View>
 
-      {/* 🧠 Fixed Navbar - Positioned absolutely at top */}
+      {/* Fixed Navbar */}
       <View style={styles.fixedNavbar}>
         <CollectionNavBar />
       </View>
 
-      {/* 🟢 Scrollable Content */}
-      <Animated.ScrollView
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        style={styles.scrollWrapper}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={[styles.container, style]}>{children}</View>
-      </Animated.ScrollView>
+      {/* Scrollable Content */}
+      {scroll ? (
+        <Animated.ScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          style={styles.scrollWrapper}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.container, style]}>{children}</View>
+        </Animated.ScrollView>
+      ) : (
+        <View style={[styles.container, styles.noScrollContainer, style]}>
+          {children}
+        </View>
+      )}
     </View>
   );
 };
@@ -62,53 +82,57 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background || "#FFFFFF",
   },
   backgroundContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
   },
   topGlow: {
     position: "absolute",
-    width: wp("80%"),
-    height: hp("50%"),
-    borderRadius: 220,
-    top: hp("-6%"),
-    left: wp("35%"),
-    backgroundColor: "rgba(229, 57, 53, 0.15)",
+    width: wp(80),
+    height: hp(50),
+    top: hp(-6),
+    left: wp(35),
+    opacity: 0.8,
   },
   bottomGlow: {
     position: "absolute",
-    width: wp("80%"),
-    height: hp("50%"),
-    borderRadius: 220,
-    top: hp("80%"),
-    left: wp("-30%"),
-    backgroundColor: "rgba(229, 57, 53, 0.15)",
-  },
-  scrollWrapper: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    // Add padding to account for fixed navbar + some spacing
-    paddingTop: Platform.OS === 'android'
-      ? StatusBar.currentHeight + hp(9) + hp(2) // StatusBar + Navbar height + spacing
-      : hp(7) + hp(9) + hp(2), // iOS safe area + Navbar height + spacing
-    // Add bottom padding to account for the bottom tab bar
-    paddingBottom: hp(12),
-  },
-  container: {
-    flexDirection: "column",
-    paddingHorizontal: 0, // Remove horizontal padding as Dashboard already has it
+    width: wp(70),
+    height: hp(40),
+    top: hp(65),
+    left: wp(-10),
+    opacity: 0.8,
   },
   fixedNavbar: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 999, // Increased z-index to ensure it stays on top
+    zIndex: 999,
     backgroundColor: "transparent",
+  },
+  scrollWrapper: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: Platform.select({
+      android: (StatusBar.currentHeight || 0) + hp(9) + hp(2),
+      ios: hp(7) + hp(9) + hp(2),
+      default: hp(9) + hp(2),
+    }),
+    paddingBottom: hp(12),
+  },
+  container: {
+    flexDirection: "column",
+    paddingHorizontal: 0,
+  },
+  noScrollContainer: {
+    flex: 1,
+    paddingTop: Platform.select({
+      android: (StatusBar.currentHeight || 0) + hp(9) + hp(2),
+      ios: hp(7) + hp(9) + hp(2),
+      default: hp(9) + hp(2),
+    }),
+    paddingBottom: hp(12),
   },
 });
 

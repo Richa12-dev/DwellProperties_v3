@@ -56,4 +56,14 @@ export default {
   disbursalColor: '#50ab5a',
   yellowStatus: '#f6c345',
   secondPrimary: '#56746b',
+    
+    // Avatar Colors for Initials
+     avatarRed: '#EF4444',
+     avatarAmber: '#F59E0B',
+     avatarEmerald: '#10B981',
+     avatarBlue: '#3B82F6',
+     avatarViolet: '#8B5CF6',
+     avatarPink: '#EC4899',
+     avatarCyan: '#06B6D4',
+     avatarOrange: '#e4f8dd',
 };

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,12 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Platform,
+  Alert,
+  Image,
 } from "react-native";
 import { TextInput } from "react-native-paper";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
@@ -18,36 +22,24 @@ import { icons } from "../../Assets";
 import { createMaintenanceRequest } from "../../Redux/Maintenance/services";
 import Toast from "react-native-simple-toast";
 import { useDispatch, useSelector } from "react-redux";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { Recorder, Player } from '@react-native-community/audio-toolkit';
+import RNFS from 'react-native-fs';
 
-const Colors = {
-  primary: "#E53935",
-  lightGray: "#F5F5F5",
-  background: "#FFFFFF",
-  text: "#333",
-  placeholder: "#9E9E9E",
-  border: "#E0E0E0",
-};
+import { getFontFamily } from '../../utils';
+import { Colors } from "../../Theme";
 
-const MaintenanceDetails = ({ onClose, property, landlordId }) => {
+
+const MaintenanceDetails = ({ onClose, property, landlordId, tenant_sub }) => {
   const dispatch = useDispatch();
   
-  // Get authentication data from Redux
   const loginData = useSelector(state => state.loginData || state.login);
+  const token = loginData?.idToken || loginData?.accessToken || loginData?.token || null;
 
-  const token =
-    loginData?.idToken ||
-    loginData?.accessToken ||
-    loginData?.token ||
-    null;
-
-  const tenant_sub = useSelector(state =>
-    state?.loginData?.user?.sub ||
-    state?.loginData?.tenant_sub ||
-    null
-  );
-
-  // Local loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const recorderRef = useRef(null);
+  const playerRef = useRef(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -57,6 +49,22 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
   const [priorityModalVisible, setPriorityModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedPriority, setSelectedPriority] = useState("");
+  
+  // Media states - NOW storing URIs instead of base64
+  const [photos, setPhotos] = useState([]);
+  const [voiceNote, setVoiceNote] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [recordingPath, setRecordingPath] = useState(null);
+
+  // Date/Time states
+  const [preferredStartDate, setPreferredStartDate] = useState(new Date());
+  const [preferredEndDate, setPreferredEndDate] = useState(
+    new Date(Date.now() + 2 * 60 * 60 * 1000)
+  );
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
   const categories = [
     "Electrical",
@@ -71,6 +79,262 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
   ];
 
   const priorities = ["High", "Moderate", "Low"];
+  
+  useEffect(() => {
+    if (property) {
+      const parts = [];
+      if (property.street) parts.push(property.street);
+      if (property.city) parts.push(property.city);
+      if (property.state) parts.push(property.state);
+      if (property.zipcode) parts.push(property.zipcode);
+      
+      const propertyLocation = parts.join(', ');
+      
+      if (propertyLocation) {
+        setLocation(propertyLocation);
+      } else {
+        setLocation(property.name || property.property_name || "");
+      }
+    }
+  }, [property]);
+
+  const takePhoto = async () => {
+    const options = {
+      mediaType: 'photo',
+      includeBase64: false,
+      saveToPhotos: true,
+    };
+
+    launchCamera(options, (response) => {
+      if (response.didCancel) return;
+
+      if (response.errorCode) {
+        console.log("Camera error:", response);
+        Toast.show("Camera error: " + response.errorMessage);
+        return;
+      }
+
+      if (response.assets && response.assets.length > 0) {
+        const asset = response.assets[0];
+        const newPhoto = {
+          uri: asset.uri,
+          type: asset.type,
+          fileName: asset.fileName,
+        };
+        setPhotos(prev => [...prev, newPhoto]);
+        Toast.show('Photo captured');
+      }
+    });
+  };
+
+  const pickImageFromGallery = async () => {
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      selectionLimit: 5,
+      includeBase64: false,
+    };
+
+    try {
+      const result = await launchImageLibrary(options);
+
+      if (result.didCancel) return;
+
+      if (result.errorCode) {
+        Toast.show('Gallery error: ' + result.errorMessage);
+        return;
+      }
+
+      if (result.assets && result.assets.length > 0) {
+        const newPhotos = result.assets.map(asset => ({
+          uri: asset.uri,
+          type: asset.type,
+          fileName: asset.fileName,
+        }));
+        setPhotos([...photos, ...newPhotos]);
+        Toast.show(`${newPhotos.length} photo(s) added`);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Toast.show('Failed to pick image');
+    }
+  };
+
+  const handlePhotoPress = () => {
+    Alert.alert(
+      'Add Photo',
+      'Choose an option',
+      [
+        { text: 'Take Photo', onPress: takePhoto },
+        { text: 'Choose from Gallery', onPress: pickImageFromGallery },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const removePhoto = (index) => {
+    const updatedPhotos = photos.filter((_, i) => i !== index);
+    setPhotos(updatedPhotos);
+    Toast.show('Photo removed');
+  };
+  
+  const recordingIntervalRef = useRef(null);
+
+
+  const startRecording = async () => {
+    try {
+      const fileName = `voice_${Date.now()}.mp4`;
+      recorderRef.current = new Recorder(fileName, {
+        bitrate: 256000,
+        channels: 2,
+        sampleRate: 44100,
+      });
+
+      await recorderRef.current.record();
+      setIsRecording(true);
+     const path = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+    setRecordingPath(path);
+
+    // ✅ START TIMER
+    recordingIntervalRef.current = setInterval(() => {
+      setRecordingDuration(prev => prev + 1);
+    }, 1000);
+    
+    } catch (e) {
+      console.log("Recording error:", e);
+      Toast.show("Failed to start recording");
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (!recorderRef.current) return;
+
+      await recorderRef.current.stop();
+      setIsRecording(false);
+      
+       clearInterval(recordingIntervalRef.current);
+    recordingIntervalRef.current = null;
+
+      setVoiceNote({
+        uri: recordingPath,
+        fileName: recordingPath.split('/').pop(),
+        type: "audio/mp4",
+         duration: recordingDuration,
+      });
+
+      Toast.show("Voice note saved");
+    } catch (e) {
+      console.log("Stop error:", e);
+      Toast.show("Failed to stop recording");
+    }
+  };
+
+  const playVoice = () => {
+    if (!voiceNote) return;
+    playerRef.current = new Player(voiceNote.uri).prepare((err) => {
+      if (err) return console.log("Playback prepare error:", err);
+      playerRef.current.play();
+    });
+  };
+
+  const deleteVoiceNote = async () => {
+    if (voiceNote?.uri) {
+      await RNFS.unlink(voiceNote.uri);
+    }
+      clearInterval(recordingIntervalRef.current);
+  recordingIntervalRef.current = null;
+  
+    setVoiceNote(null);
+     setRecordingDuration(0);
+    recorderRef.current = null;
+    playerRef.current = null;
+    Toast.show("Voice note removed");
+  };
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  useEffect(() => {
+  const start = new Date();
+  start.setHours(9, 0, 0, 0);
+
+  const end = new Date();
+  end.setHours(10, 0, 0, 0);
+
+  setPreferredStartDate(start);
+  setPreferredEndDate(end);
+}, []);
+
+
+  const onStartDateChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowStartDatePicker(false);
+    }
+    
+    if (selectedDate) {
+      const newStartDate = new Date(selectedDate);
+      newStartDate.setHours(preferredStartDate.getHours());
+      newStartDate.setMinutes(preferredStartDate.getMinutes());
+      
+      setPreferredStartDate(newStartDate);
+      
+      const newEndDate = new Date(selectedDate);
+      newEndDate.setHours(preferredEndDate.getHours());
+      newEndDate.setMinutes(preferredEndDate.getMinutes());
+      
+      if (newEndDate <= newStartDate) {
+        newEndDate.setTime(newStartDate.getTime() + 2 * 60 * 60 * 1000);
+      }
+      
+      setPreferredEndDate(newEndDate);
+    }
+  };
+
+  const onStartTimeChange = (event, selectedTime) => {
+    if (Platform.OS === 'android') {
+      setShowStartTimePicker(false);
+    }
+    
+    if (selectedTime) {
+      setPreferredStartDate(selectedTime);
+      if (preferredEndDate <= selectedTime) {
+        setPreferredEndDate(new Date(selectedTime.getTime() + 2 * 60 * 60 * 1000));
+      }
+    }
+  };
+
+  const onEndTimeChange = (event, selectedTime) => {
+    if (Platform.OS === 'android') {
+      setShowEndTimePicker(false);
+    }
+    
+    if (selectedTime) {
+      if (selectedTime <= preferredStartDate) {
+        Toast.show("End time must be after start time");
+        return;
+      }
+      setPreferredEndDate(selectedTime);
+    }
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   const handleSelectCategory = (item) => {
     setSelectedCategory(item);
@@ -115,46 +379,44 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
     }
 
     setIsSubmitting(true);
-
-    // ✅ Create payload exactly matching your Postman structure
+    
     const payload = {
       title: title.trim(),
       description: description.trim(),
-     category: [selectedCategory],
+      category: selectedCategory,
       priority: selectedPriority,
       location: location.trim(),
-      landlord_id: landlordId || property?.landlord_id || "LL_456",
-      property_id: property?.property_id || property?.id || "PROP_123",
-      preferred_start: new Date().toISOString(),
-      preferred_end: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      preferred_start: preferredStartDate.toISOString(),
+      preferred_end: preferredEndDate.toISOString(),
       timezone: "Asia/Kolkata",
+      image_urls: photos.map(p => p.uri),
+      voice_url: voiceNote?.uri || null,
     };
 
-    console.log("🚀 Submitting Maintenance Request:", payload);
-    console.log("🔑 Using token:", token ? "Present" : "Missing");
+    console.log("✅ Submitting Maintenance Request:", JSON.stringify(payload, null, 2));
 
     try {
-      // ✅ Pass payload directly - services.js will handle the token from Redux
       const result = await dispatch(
-        createMaintenanceRequest(payload)
+        createMaintenanceRequest({ ...payload, token })
       ).unwrap();
 
       console.log("✅ Maintenance request created successfully:", result);
       
       Toast.show("Request submitted successfully!");
       
-      // Reset form
       setTitle("");
       setDescription("");
-      setLocation("");
       setSelectedCategory("");
       setSelectedPriority("");
+      setPreferredStartDate(new Date());
+      setPreferredEndDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
+      setPhotos([]);
+      setVoiceNote(null);
       
-      // Close modal - parent will refresh the list
       onClose();
     } catch (error) {
       console.error("❌ Error submitting maintenance:", error);
-      Toast.show(error?.toString() || "Failed to create request");
+      Toast.show(error?.message || error?.toString() || "Failed to create request");
     } finally {
       setIsSubmitting(false);
     }
@@ -182,7 +444,7 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
           onChangeText={setTitle}
           style={styles.input}
           outlineColor={Colors.border}
-          activeOutlineColor={Colors.primary}
+          activeOutlineColor={Colors.red}
           editable={!isSubmitting}
         />
 
@@ -197,7 +459,7 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
           onChangeText={setDescription}
           style={styles.input}
           outlineColor={Colors.border}
-          activeOutlineColor={Colors.primary}
+          activeOutlineColor={Colors.red}
           editable={!isSubmitting}
         />
 
@@ -212,7 +474,7 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
             >
               <Text
                 style={{
-                  color: selectedCategory ? Colors.text : Colors.placeholder,
+                  color: selectedCategory ? Colors.black : Colors.placeholder,
                 }}
               >
                 {selectedCategory || "Select"}
@@ -235,7 +497,7 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
             >
               <Text
                 style={{
-                  color: selectedPriority ? Colors.text : Colors.placeholder,
+                  color: selectedPriority ? Colors.black : Colors.placeholder,
                 }}
               >
                 {selectedPriority || "Select"}
@@ -251,10 +513,10 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
         </View>
 
         {/* Location */}
-        <Text style={styles.label}>Location*</Text>
+        <Text style={styles.label}>Location* (Auto-filled)</Text>
         <TextInput
           mode="outlined"
-          placeholder="e.g. Kitchen, Bathroom, Living Room"
+          placeholder="Property location"
           value={location}
           onChangeText={setLocation}
           style={styles.input}
@@ -263,11 +525,74 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
           editable={!isSubmitting}
         />
 
+        {/* Preferred Schedule */}
+        <Text style={styles.label}>Preferred Schedule*</Text>
+        <View style={styles.dateTimeRow}  numberOfLines={1}>
+          <TouchableOpacity
+            onPress={() => !isSubmitting && setShowStartDatePicker(true)}
+            style={styles.dateBox}
+            disabled={isSubmitting}
+          >
+            <AppIcon
+              name={icons.calender}
+              height={hp(2)}
+              width={hp(2)}
+              color={Colors.placeholder}
+            />
+            <Text style={styles.dateTimeTextCompact}
+             numberOfLines={1}
+   >
+              {formatDate(preferredStartDate)}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => !isSubmitting && setShowStartTimePicker(true)}
+            style={styles.timeBox}
+            disabled={isSubmitting}
+          >
+            <AppIcon
+              name={icons.clock}
+              height={hp(2)}
+              width={hp(2)}
+              color={Colors.placeholder}
+            />
+            <Text style={styles.dateTimeTextCompact}
+             numberOfLines={1}
+  ellipsizeMode="clip">
+              {formatTime(preferredStartDate)}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.timeDivider}>
+            <Text style={styles.dividerText}>to</Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => !isSubmitting && setShowEndTimePicker(true)}
+            style={styles.timeBox}
+            disabled={isSubmitting}
+          >
+            <AppIcon
+              name={icons.clock}
+              height={hp(2)}
+              width={hp(2)}
+              color={Colors.placeholder}
+            />
+            <Text style={styles.dateTimeTextCompact}
+             numberOfLines={1}
+             ellipsizeMode="clip">
+              {formatTime(preferredEndDate)}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Attachments */}
         <Text style={styles.label}>Attachment</Text>
         <View style={styles.attachRow}>
           <TouchableOpacity
             style={[styles.attachButton, styles.activeAttach]}
+            onPress={handlePhotoPress}
             disabled={isSubmitting}
           >
             <AppIcon
@@ -280,18 +605,65 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.attachButton}
+            style={[
+              styles.attachButton,
+              (isRecording || voiceNote) && styles.activeAttach
+            ]}
+            onPress={isRecording ? stopRecording : (voiceNote ? deleteVoiceNote : startRecording)}
             disabled={isSubmitting}
           >
             <AppIcon
               name={icons.voice}
               height={hp(2)}
               width={hp(2)}
-              color={Colors.placeholder}
+              color={(isRecording || voiceNote) ? "#fff" : Colors.placeholder}
             />
-            <Text style={styles.attachText}>Voice Note</Text>
+            <Text style={(isRecording || voiceNote) ? styles.attachTextActive : styles.attachText}>
+              {isRecording ? `Recording ${formatDuration(recordingDuration)}` :
+               voiceNote ? `Voice Saved` : 'Voice Note'}
+            </Text>
           </TouchableOpacity>
         </View>
+        
+        <View style={styles.attachmentPreviewRow}>
+        {/* Photo Preview */}
+        {photos.length > 0 && (
+          <ScrollView horizontal style={styles.photoPreviewContainer}>
+            {photos.map((photo, index) => (
+              <View key={index} style={styles.photoPreview}>
+                <Image source={{ uri: photo.uri }} style={styles.photoImage} />
+                <TouchableOpacity
+                  style={styles.removePhotoBtn}
+                  onPress={() => removePhoto(index)}
+                >
+                  <AppIcon name={icons.close} height={hp(2)} width={hp(2)} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+        
+        {/* Voice Note Preview */}
+{voiceNote && (
+  <View style={styles.voicePreview}>
+    <TouchableOpacity onPress={playVoice} style={styles.voicePlayBtn}>
+      <AppIcon name={icons.play} height={hp(2.2)} width={hp(2.2)} color="#fff" />
+    </TouchableOpacity>
+
+    <View style={styles.voiceInfo}>
+      <Text style={styles.voiceTitle}>Voice Note</Text>
+      <Text style={styles.voiceDuration}>
+        {formatDuration(voiceNote.duration || 0)}
+      </Text>
+    </View>
+
+    <TouchableOpacity onPress={deleteVoiceNote}>
+      <AppIcon name={icons.close} height={hp(2)} width={hp(2)} />
+    </TouchableOpacity>
+  </View>
+)}
+
+</View>
 
         {/* Buttons */}
         <View style={styles.buttonRow}>
@@ -326,7 +698,135 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
         </View>
       </ScrollView>
 
-      {/* CATEGORY MODAL */}
+      {/* Date/Time Pickers - iOS */}
+      {Platform.OS === 'ios' && showStartDatePicker && (
+        <Modal visible={showStartDatePicker} transparent animationType="slide">
+          <View style={styles.iosPickerModal}>
+            <View style={styles.iosPickerContainer}>
+              <View style={styles.iosPickerHeader}>
+                <TouchableOpacity
+                  onPress={() => setShowStartDatePicker(false)}
+                  style={styles.iosPickerButton}
+                >
+                  <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.iosPickerTitle}>Select Date</Text>
+                <TouchableOpacity
+                  onPress={() => setShowStartDatePicker(false)}
+                  style={styles.iosPickerButton}
+                >
+                  <Text style={[styles.iosPickerButtonText, { color: Colors.black }]}>
+                    Done
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.pickerWrapper}>
+                <DateTimePicker
+                  value={preferredStartDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={onStartDateChange}
+                  minimumDate={new Date()}
+                  style={{ backgroundColor: 'white' }}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {Platform.OS === 'android' && showStartDatePicker && (
+        <DateTimePicker
+          value={preferredStartDate}
+          mode="date"
+          display="default"
+          onChange={onStartDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {/* iOS Start Time */}
+      {Platform.OS === 'ios' && showStartTimePicker && (
+        <Modal visible transparent animationType="slide">
+          <View style={styles.iosPickerModal}>
+            <View style={styles.iosPickerContainer}>
+              <View style={styles.iosPickerHeader}>
+                <TouchableOpacity
+                  onPress={() => setShowStartTimePicker(false)}
+                  style={styles.iosPickerButton}
+                >
+                  <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.iosPickerTitle}>Start Time</Text>
+                <TouchableOpacity
+                  onPress={() => setShowStartTimePicker(false)}
+                  style={styles.iosPickerButton}
+                >
+                  <Text style={styles.iosPickerButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.pickerWrapper}>
+                <DateTimePicker
+                  value={preferredStartDate}
+                  mode="time"
+                  display="spinner"
+                  onChange={onStartTimeChange}
+                  style={styles.datePicker}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Android Start Time */}
+      {Platform.OS === 'android' && showStartTimePicker && (
+        <DateTimePicker
+          value={preferredStartDate}
+          mode="time"
+          display="default"
+          onChange={onStartTimeChange}
+        />
+      )}
+
+      {/* iOS End Time */}
+      {Platform.OS === 'ios' && showEndTimePicker && (
+        <Modal visible transparent animationType="slide">
+          <View style={styles.iosPickerModal}>
+            <View style={styles.iosPickerContainer}>
+              <View style={styles.iosPickerHeader}>
+                <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
+                  <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.iosPickerTitle}>End Time</Text>
+                <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
+                  <Text style={styles.iosPickerButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.pickerWrapper}>
+                <DateTimePicker
+                  value={preferredEndDate}
+                  mode="time"
+                  display="spinner"
+                  onChange={onEndTimeChange}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Android End Time */}
+      {Platform.OS === 'android' && showEndTimePicker && (
+        <DateTimePicker
+          value={preferredEndDate}
+          mode="time"
+          display="default"
+          onChange={onEndTimeChange}
+        />
+      )}
+
+      {/* Category Modal */}
       <Modal
         visible={categoryModalVisible}
         transparent
@@ -355,7 +855,7 @@ const MaintenanceDetails = ({ onClose, property, landlordId }) => {
         </TouchableOpacity>
       </Modal>
 
-      {/* PRIORITY MODAL */}
+      {/* Priority Modal */}
       <Modal
         visible={priorityModalVisible}
         transparent
@@ -389,7 +889,7 @@ export default MaintenanceDetails;
 
 const styles = StyleSheet.create({
   modalContainer: {
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.white,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     paddingHorizontal: wp(6),
@@ -406,7 +906,7 @@ const styles = StyleSheet.create({
   header: {
     fontSize: hp(2.6),
     fontWeight: "700",
-    color: Colors.text,
+    color: Colors.black,
   },
   closeButton: {
     backgroundColor: "#F3F3F3",
@@ -416,7 +916,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: hp(1.7),
     fontWeight: "500",
-    color: Colors.text,
+    color: Colors.black,
     marginTop: hp(1.5),
     marginBottom: hp(0.5),
   },
@@ -441,6 +941,67 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
   },
+  dateTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 2,
+  },
+dateBox: {
+  width: wp(30),
+  borderWidth: 1,
+  borderColor: Colors.border,
+  borderRadius: 8,
+  paddingHorizontal: wp(2),
+  paddingVertical: hp(1),
+  flexDirection: "row",
+  alignItems: "flex-start",
+  backgroundColor: "#fff",
+  gap: 4,
+},
+
+timeBox: {
+  width: wp(22), // SAME width for both time boxes
+  borderWidth: 1,
+  borderColor: Colors.border,
+  borderRadius: 8,
+  paddingHorizontal: wp(2),
+  paddingVertical: hp(1.2),
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#fff",
+  gap: 2,
+},
+
+  dateTimeTextCompact: {
+    fontSize: hp(1.4),
+    color: Colors.black,
+    flex: 1,
+    flexShrink: 1,
+  },
+  timeDivider: {
+    paddingHorizontal: wp(1),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dividerText: {
+    fontSize: hp(1.6),
+    color: Colors.placeholder,
+    fontWeight: "500",
+  },
+  durationInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    padding: hp(1),
+    borderRadius: 8,
+    marginTop: hp(1),
+    gap: 6,
+  },
+  durationText: {
+    fontSize: hp(1.5),
+    color: Colors.placeholder,
+  },
   attachRow: {
     flexDirection: "row",
     marginTop: hp(1),
@@ -456,13 +1017,13 @@ const styles = StyleSheet.create({
     marginRight: wp(3),
   },
   activeAttach: {
-    backgroundColor: Colors.text,
-    borderColor: Colors.text,
+    backgroundColor: Colors.black,
+    borderColor: Colors.black,
   },
   attachText: {
     marginLeft: 5,
     fontSize: hp(1.7),
-    color: Colors.text,
+    color: Colors.black,
   },
   attachTextActive: {
     marginLeft: 5,
@@ -484,13 +1045,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cancelText: {
-    color: Colors.text,
+    color: Colors.black,
     fontSize: hp(1.9),
     fontWeight: "600",
   },
   submitButton: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.red,
     borderRadius: 8,
     paddingVertical: hp(1.5),
     alignItems: "center",
@@ -538,6 +1099,124 @@ const styles = StyleSheet.create({
   optionText: {
     textAlign: "center",
     fontSize: hp(1.9),
-    color: Colors.text,
+    color: Colors.black,
   },
-});
+  // iOS Picker Modal Styles
+  iosPickerModal: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  iosPickerContainer: {
+    backgroundColor: "#F9F9F9",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: hp(4),
+  },
+  iosPickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(2),
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  iosPickerTitle: {
+    fontSize: hp(2),
+    fontWeight: "600",
+    color: Colors.black,
+  },
+  iosPickerButton: {
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.5),
+  },
+  iosPickerButtonText: {
+    fontSize: hp(2),
+    fontWeight: "600",
+    color: Colors.black,
+  },
+  photoPreviewContainer: {
+   flexDirection: 'row',
+    marginVertical: 10,
+  },
+  photoPreview: {
+    position: 'relative',
+    marginRight: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+    width: wp(16),
+    height: hp(6),
+    backgroundColor: '#f0f0f0',
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  removePhotoBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    padding: 2,
+  },
+  pickerWrapper: {
+  width: '100%',
+  alignItems: 'center',
+  backgroundColor: 'white',
+},
+
+datePicker: {
+  width: '100%',
+  height: hp(25), // important for spinner
+},
+
+voicePreview: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#F9FAFB',
+  borderRadius: 8,
+  paddingHorizontal: wp(2),
+  paddingVertical: hp(0.8),
+  marginLeft: wp(2),
+  flex: 1,
+},
+
+voicePlayBtn: {
+  width: wp(5),
+  height: wp(5),
+  borderRadius: wp(3),
+  backgroundColor: Colors.black,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+voiceInfo: {
+  flex: 1,
+  marginLeft: wp(3),
+},
+
+voiceTitle: {
+  fontSize: hp(1.7),
+  fontWeight: '600',
+  color: Colors.black,
+},
+
+voiceDuration: {
+  fontSize: hp(1.4),
+  color: Colors.placeholder,
+  marginTop: 2,
+},
+        attachmentPreviewRow:{
+        flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: hp(1),
+}
+
+
+  });

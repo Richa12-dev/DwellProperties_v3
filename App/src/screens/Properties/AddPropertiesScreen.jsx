@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+    Alert,
 } from "react-native";
 import { TextInput } from "react-native-paper";
 import { useDispatch, useSelector } from 'react-redux';
@@ -24,6 +25,7 @@ import Container from "../../components/Container/Container";
 import { createProperty, updateProperty } from '../../Redux/Properties/services';
 import { Colors } from '../../Theme';
 import { getFontFamily } from '../../utils';
+import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 
 
 const initialForm = {
@@ -33,7 +35,7 @@ const initialForm = {
   images: [],
   street: "",
   city: "",
-  state: "", // ✅ Already present
+  state: "",
   zip_code: "",
 
   // Step 2
@@ -68,7 +70,7 @@ const Step1 = memo(({ form, errors, handleChange, pickImages, removeImage, onNex
     {/* Property Name */}
     <View style={styles.fieldContainer}>
       <View style={styles.labelRow}>
-        <AppIcon name={icons.totalProperties} size={hp(2.5)}  />
+        <AppIcon name={icons.redProperties} size={hp(2.5)}  />
         <Text style={styles.label}>Property Name</Text>
       </View>
       <TextInput
@@ -87,7 +89,7 @@ const Step1 = memo(({ form, errors, handleChange, pickImages, removeImage, onNex
     {/* Description */}
     <View style={styles.fieldContainer}>
       <View style={styles.labelRow}>
-        <AppIcon name={icons.document} size={hp(2.5)}  />
+        <AppIcon name={icons.progresses} size={hp(2.5)}  />
         <Text style={styles.label}>Description</Text>
       </View>
       <TextInput
@@ -106,7 +108,7 @@ const Step1 = memo(({ form, errors, handleChange, pickImages, removeImage, onNex
     {/* Property Images */}
     <View style={styles.fieldContainer}>
       <View style={styles.labelRow}>
-        <AppIcon name={icons.photo} size={hp(2.5)}  />
+        <AppIcon name={icons.photos} size={hp(2.5)}  />
         <Text style={styles.label}>Property Images ({form.images.length}/9)</Text>
       </View>
 
@@ -127,7 +129,7 @@ const Step1 = memo(({ form, errors, handleChange, pickImages, removeImage, onNex
       )}
 
       <TouchableOpacity style={styles.addImageBtn} onPress={pickImages}>
-        <AppIcon name={icons.photo} size={hp(2.5)} color={Colors.text} />
+        <AppIcon name={icons.photo} size={hp(2.5)} color={Colors.black} />
         <Text style={styles.addImageText}>Add Images</Text>
       </TouchableOpacity>
     </View>
@@ -199,7 +201,7 @@ const Step1 = memo(({ form, errors, handleChange, pickImages, removeImage, onNex
 
     {/* Next Button */}
     <TouchableOpacity style={styles.nextButton} onPress={onNext}>
-      <Text style={styles.nextButtonText}>Property Type and Pricing</Text>
+      <Text style={styles.nextButtonText}>  Property Type {"\n"}and Pricing</Text>
       <AppIcon name={icons.arrowBack} size={hp(2)} color="white" style={{ transform: [{ rotate: '180deg' }] }} />
     </TouchableOpacity>
   </View>
@@ -219,9 +221,10 @@ const Step2 = memo(({
   setBathroomsModal
 }) => (
   <View style={styles.stepContainer}>
-    <Text style={styles.stepTitle}>Choose Property Type</Text>
+ 
     <Text style={styles.stepSubtitle}>Edit Property Types and Pricing Details</Text>
 
+<View style={styles.glassContainer}>
     {/* Property Type */}
     <View style={styles.fieldContainer}>
       <Text style={styles.subLabel}>Property Type</Text>
@@ -294,7 +297,9 @@ const Step2 = memo(({
         />
       </View>
     </View>
+    </View>
 
+<View style={styles.glassContainer}>
     {/* Pricing */}
     <View style={styles.fieldContainer}>
       <View style={styles.labelRow}>
@@ -330,11 +335,12 @@ const Step2 = memo(({
         left={<TextInput.Affix text="$" />}
       />
     </View>
+    </View>
 
     {/* Navigation */}
     <View style={styles.buttonRow}>
       <TouchableOpacity style={styles.backButton} onPress={onBack}>
-        <AppIcon name={icons.arrowBack} size={hp(2)} color={Colors.text} />
+        <AppIcon name={icons.arrowBack} size={hp(2)}  />
         <Text style={styles.backButtonText}>Back</Text>
       </TouchableOpacity>
 
@@ -533,15 +539,96 @@ const AddPropertiesScreen = ({ onClose = () => {}, propertyData = null }) => {
   const landlordId = authData?.landlordId || authData?.userData?.landlordId || null;
 
   const [step, setStep] = useState(1);
+  
+  const transformPropertyImages = (propertyData) => {
+  if (!propertyData) return [];
+
+  const images = [];
+
+  // Priority 1: Check media.photos_preview
+  if (propertyData?.media?.photos_preview && Array.isArray(propertyData.media.photos_preview)) {
+    propertyData.media.photos_preview.forEach(img => {
+      if (typeof img === 'object' && img?.url) {
+        images.push(img.url);
+      } else if (typeof img === 'string') {
+        if (!img.startsWith('http') && img.includes('/')) {
+          images.push(`https://dp-properties.s3.amazonaws.com/${img}`);
+        } else {
+          images.push(img);
+        }
+      }
+    });
+  }
+
+  // Priority 2: Check media.photos_expanded
+  if (images.length === 0 && propertyData?.media?.photos_expanded && Array.isArray(propertyData.media.photos_expanded)) {
+    propertyData.media.photos_expanded.forEach(img => {
+      if (typeof img === 'object' && img?.url) {
+        images.push(img.url);
+      } else if (typeof img === 'string') {
+        if (!img.startsWith('http') && img.includes('/')) {
+          images.push(`https://dp-properties.s3.amazonaws.com/${img}`);
+        } else {
+          images.push(img);
+        }
+      }
+    });
+  }
+
+  // Priority 3: Check image_urls
+  if (images.length === 0 && propertyData?.image_urls && Array.isArray(propertyData.image_urls)) {
+    propertyData.image_urls.forEach(url => {
+      if (typeof url === 'string') {
+        if (!url.startsWith('http') && url.includes('/')) {
+          images.push(`https://dp-properties.s3.amazonaws.com/${url}`);
+        } else {
+          images.push(url);
+        }
+      }
+    });
+  }
+
+  // Priority 4: Check images array
+  if (images.length === 0 && propertyData?.images && Array.isArray(propertyData.images)) {
+    propertyData.images.forEach(img => {
+      if (typeof img === 'string') {
+        if (!img.startsWith('http') && img.includes('/')) {
+          images.push(`https://dp-properties.s3.amazonaws.com/${img}`);
+        } else {
+          images.push(img);
+        }
+      } else if (typeof img === 'object' && img?.uri) {
+        images.push(img.uri);
+      }
+    });
+  }
+
+  // Priority 5: Check media.photos (S3 keys)
+  if (images.length === 0 && propertyData?.media?.photos && Array.isArray(propertyData.media.photos)) {
+    propertyData.media.photos.forEach(key => {
+      if (typeof key === 'string') {
+        images.push(`https://dp-properties.s3.amazonaws.com/${key}`);
+      }
+    });
+  }
+
+  console.log('✅ Transformed images for edit:', images);
+  return images;
+};
+
+  
   const [form, setForm] = useState(() => {
   if (propertyData) {
-    return {
+    
+    const existingImages = transformPropertyImages(propertyData);
+   
+      return {
       name: propertyData.name || "",
       description: propertyData.description || "",
-      images: propertyData.image_urls || propertyData.images || [],
+       images: existingImages,
       street: propertyData.street || "",
       city: propertyData.city || "",
-      state: propertyData.state || "", // ✅ Make sure this is mapped
+      state: propertyData.state || "",
       zip_code: propertyData.zipcode || propertyData.zip_code || "",
       property_type: propertyData.property_type || "Apartment",
       bedrooms: propertyData.bedrooms?.toString() || "",
@@ -561,10 +648,10 @@ const AddPropertiesScreen = ({ onClose = () => {}, propertyData = null }) => {
           }, {...initialForm.amenities})
         : (propertyData.amenities || {...initialForm.amenities}),
       availability_status: propertyData.availability === 'available' ? 'Available' : 'Occupied',
-      // ✅ FIXED: Handle tenant data from tenants array
-      tenant_id: propertyData.tenants?.[0]?.email || propertyData.tenant_id || "",
-      tenant_name: propertyData.tenants?.[0]?.name || propertyData.tenant_name || "",
-      tenant_email: propertyData.tenants?.[0]?.email || "", // ✅ ADD THIS
+      
+         tenant_email: propertyData.tenants?.[0]?.email || "",
+      tenant_name: propertyData.tenants?.[0]?.name || "",
+      tenant_id: propertyData.tenants?.[0]?.email || "",
     };
   }
   return initialForm;
@@ -606,6 +693,29 @@ const AddPropertiesScreen = ({ onClose = () => {}, propertyData = null }) => {
       },
     }));
   }, []);
+  
+  const pickImages = useCallback(() => {
+  // Show action sheet or alert to let user choose
+  Alert.alert(
+    'Add Images',
+    'Choose an option',
+    [
+      {
+        text: 'Open Camera',
+        onPress: openCamera,
+      },
+      {
+        text: 'Choose from Gallery',
+        onPress: pickImagesFromGallery,
+      },
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+    ],
+    { cancelable: true }
+  );
+}, []);
 
   const pickImagesPlaceholder = useCallback(() => {
     const placeholder = "https://via.placeholder.com/300x200.png?text=Property+Image";
@@ -619,6 +729,52 @@ const AddPropertiesScreen = ({ onClose = () => {}, propertyData = null }) => {
       return { ...p, images: arr };
     });
   }, []);
+  
+  const pickImagesFromGallery = async () => {
+  try {
+    const res = await launchImageLibrary({
+      mediaType: 'photo',
+      selectionLimit: 9,
+      quality: 0.8,
+    });
+
+    if (res.didCancel) return;
+
+    if (res.assets) {
+      const selected = res.assets.map(item => item.uri);
+      setForm(prev => ({
+        ...prev,
+        images: [...prev.images, ...selected].slice(0, 9),
+      }));
+    }
+  } catch (err) {
+    console.log("Gallery Error:", err);
+  }
+};
+
+// 📌 Open Camera
+const openCamera = async () => {
+  try {
+    const res = await launchCamera({
+      mediaType: 'photo',
+      cameraType: 'back',
+      quality: 0.8,
+    });
+
+    if (res.didCancel) return;
+
+    if (res.assets) {
+      const newImage = res.assets[0].uri;
+      setForm(prev => ({
+        ...prev,
+        images: [...prev.images, newImage].slice(0, 9),
+      }));
+    }
+  } catch (err) {
+    console.log("Camera Error:", err);
+  }
+};
+
 
 const validateStep = useCallback((s = step) => {
   const err = {};
@@ -737,16 +893,16 @@ const validateStep = useCallback((s = step) => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {step === 1 && (
-            <Step1
-              form={form}
-              errors={errors}
-              handleChange={handleChange}
-              pickImages={pickImagesPlaceholder}
-              removeImage={removeImage}
-              onNext={onNext}
-            />
-          )}
+       {step === 1 && (
+  <Step1
+    form={form}
+    errors={errors}
+    handleChange={handleChange}
+    pickImages={pickImages}  // ✅ Updated here
+    removeImage={removeImage}
+    onNext={onNext}
+  />
+)}
           {step === 2 && (
             <Step2
               form={form}
@@ -858,7 +1014,7 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: hp(2.6),
     fontWeight: "bold",
-    color: Colors.text,
+    color: Colors.black,
     marginBottom: hp(0.5),
     fontFamily: getFontFamily('bold'),
   },
@@ -906,7 +1062,7 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     fontSize: hp(1.8),
-    color: Colors.text,
+    color: Colors.black,
     fontFamily: getFontFamily('regular'),
   },
   placeholderText: {
@@ -934,7 +1090,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -hp(0.8),
     right: -wp(1.5),
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.red,
     borderRadius: 50,
     width: wp(6),
     height: wp(6),
@@ -954,27 +1110,29 @@ const styles = StyleSheet.create({
   addImageText: {
     marginLeft: wp(2),
     fontSize: hp(1.8),
-    color: Colors.text,
+    color: Colors.black,
     fontWeight: "500",
     fontFamily: getFontFamily('medium'),
   },
   nextButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.primary,
+    justifyContent: "flex-end",
+  
     borderRadius: 8,
     paddingVertical: hp(1.8),
     marginTop: hp(2),
   },
   nextButtonText: {
-    color: "white",
+    color: "black",
     fontSize: hp(1.8),
     fontWeight: "600",
     marginRight: wp(2),
     fontFamily: getFontFamily('semiBold'),
+     textAlign: "right",
   },
-  buttonRow: {
+  
+    buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: hp(3),
@@ -987,7 +1145,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     marginLeft: wp(2),
     fontSize: hp(1.8),
-    color: Colors.text,
+  
     fontWeight: "500",
     fontFamily: getFontFamily('medium'),
   },
@@ -996,7 +1154,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.primary,
+   
     borderRadius: 8,
     paddingVertical: hp(1.8),
     marginLeft: wp(4),
@@ -1013,7 +1171,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: hp(1.8),
-    color: Colors.text,
+    color: Colors.black,
     fontWeight: "600",
     fontFamily: getFontFamily('semiBold'),
   },
@@ -1058,14 +1216,14 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   amenityChipActive: {
-    borderColor: Colors.primary,
+    borderColor: Colors.red,
     backgroundColor: "#FFEBEE",
   },
   amenityCheckmark: {
     position: "absolute",
     top: -hp(1),
     right: -wp(2),
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.red,
     borderRadius: 50,
     width: wp(6),
     height: wp(6),
@@ -1074,13 +1232,13 @@ const styles = StyleSheet.create({
   },
   amenityLabel: {
     fontSize: hp(1.6),
-    color: Colors.text,
+    color: Colors.black,
     marginTop: hp(1),
     textAlign: "center",
     fontFamily: getFontFamily('regular'),
   },
   amenityLabelActive: {
-    color: Colors.primary,
+    color: Colors.red,
     fontWeight: "600",
     fontFamily: getFontFamily('semiBold'),
   },
@@ -1114,7 +1272,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: hp(1.5),
     textAlign: "center",
-    color: Colors.text,
+    color: Colors.black,
     fontFamily: getFontFamily('semiBold'),
   },
   modalScroll: {
@@ -1128,7 +1286,22 @@ const styles = StyleSheet.create({
   modalOptionText: {
     textAlign: "center",
     fontSize: hp(1.9),
-    color: Colors.text,
+    color: Colors.black,
     fontFamily: getFontFamily('regular'),
   },
+  
+  glassContainer: {
+  backgroundColor: "rgba(255, 255, 255, 0.15)",
+  padding: wp(4),
+  borderRadius: 15,
+  marginTop: hp(2),
+  borderWidth: 1,
+  borderColor: "rgba(255, 255, 255, 0.7)",
+  shadowColor: "#000",
+  shadowOpacity: 0.15,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  backdropFilter: "blur(10px)",  // iOS only (React Native WebView)
+},
+
 });

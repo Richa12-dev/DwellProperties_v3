@@ -35,16 +35,16 @@ const PropertyFilters = ({
   const [showTenantStatusModal, setShowTenantStatusModal] = useState(false);
 
   const propertyTypes = [
-    { label: 'All Properties', value: 'all' },
-    { label: 'Apartments', value: 'Apartment' },
-    { label: 'Complex', value: 'Complex' },
-    { label: 'House', value: 'House' },
-    { label: 'Villa', value: 'Villa' },
-    { label: 'Condo', value: 'Condo' },
-    { label: 'Townhouse', value: 'Townhouse' },
-    { label: 'Duplex', value: 'Duplex' },
-    { label: 'Studio', value: 'Studio' },
-    { label: 'Penthouse', value: 'Penthouse' },
+   { label: 'All Properties', value: 'all' },
+    { label: 'Apartment', value: 'apartment' },
+    { label: 'Complex', value: 'complex' },
+    { label: 'House', value: 'house' },
+    { label: 'Villa', value: 'villa' },
+    { label: 'Condo', value: 'condo' },
+    { label: 'Townhouse', value: 'townhouse' },
+    { label: 'Duplex', value: 'duplex' },
+    { label: 'Studio', value: 'studio' },
+    { label: 'Penthouse', value: 'penthouse' },
   ];
 
   const availabilityOptions = [
@@ -128,14 +128,14 @@ const PropertyFilters = ({
   );
 
   const FilterButton = ({ label, onPress }) => (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={{ flex: 1 }}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} >
       <View style={styles.glassCard}>
         <Box style={styles.filterButtonInner}>
-          <HStack justifyContent="space-between" alignItems="center">
-            <Text fontSize={hp(1.8)} fontWeight="500" color="gray.700">
+          <HStack justifyContent="space-between" alignItems="center"   space={wp(1)} >
+            <Text fontSize={hp(1.8)} fontWeight="500" color="gray.700"  numberOfLines={1}>
               {label}
             </Text>
-            <AppIcon name={icons.arrowDown} size={wp(4)} color={Colors.black} />
+            <AppIcon name={icons.arrowDown} size={wp(3)} color={Colors.black} />
           </HStack>
         </Box>
       </View>
@@ -164,9 +164,14 @@ const PropertyFilters = ({
   // Render based on active tab
   if (activeTab === 'properties') {
     return (
-      <VStack mx={wp(4.5)} mb={hp(2)}>
+      <VStack mx={wp(4.5)} mb={hp(0.5)}>
         {/* Properties Filter Buttons */}
-        <HStack space={wp(2)}>
+        <HStack
+        alignItems="center"
+  flexDirection="row"
+  flexWrap="nowrap"
+  space={wp(1)}>
+        <AppIcon name={icons.progresses} size={wp(6)} />
           <FilterButton
             label="Property Type"
             onPress={() => setShowTypeModal(true)}
@@ -202,7 +207,7 @@ const PropertyFilters = ({
 
   if (activeTab === 'tenants') {
     return (
-      <VStack mx={wp(4.5)} mb={hp(2)}>
+      <VStack mx={wp(4.5)} mb={hp(1)}>
         {/* Tenants Filter Button */}
         <HStack>
           <FilterButton
@@ -246,7 +251,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: hp(2),
+    marginBottom: hp(1),
   },
   headerTitle: {
     fontSize: hp(2.2),
@@ -265,7 +270,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   filterButtonInner: {
-    padding: hp(1.8),
+    padding: hp(1),
   },
 });
 

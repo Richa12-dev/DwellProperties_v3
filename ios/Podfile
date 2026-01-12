@@ -1,6 +1,4 @@
-# Resolve react_native_pods.rb with node to allow for hoisting
 def node_require(script)
-  # Resolve script with node to allow for hoisting
   require Pod::Executable.execute_command('node', ['-p',
     "require.resolve(
       '#{script}',
@@ -8,39 +6,105 @@ def node_require(script)
     )", __dir__]).strip
 end
 
-require_relative '../node_modules/react-native/scripts/react_native_pods'
+node_require('react-native/scripts/react_native_pods.rb')
+node_require('react-native-permissions/scripts/setup.rb')
 
-# Set minimum iOS version (React Native 0.81.4 requires iOS 13.4+)
-platform :ios, '16.0'
+platform :ios, '15.1'
 
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
-
 target 'DwellProperties_v3' do
   config = use_native_modules!
-
+  
+  # Enable modular headers for Firebase pods
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  
   use_react_native!(
     :path => config[:reactNativePath],
-    # Hermes is now enabled by default. Disable by setting this flag to false.
-    :hermes_enabled => false,
-    # DISABLE FABRIC/NEW ARCHITECTURE
+    :hermes_enabled => true,
     :fabric_enabled => false,
-    # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
-
+  
   post_install do |installer|
-    # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
+    # THIS IS CRITICAL - Must come first
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => true
-      # :ccache_enabled => true
+      :mac_catalyst_enabled => false
     )
+
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+        
+        # CRITICAL C++ Settings for std::thread
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
+        
+        # Additional C++ flags
+        config.build_settings['GCC_C_LANGUAGE_STANDARD'] = 'c11'
+        config.build_settings['GCC_ENABLE_CPP_EXCEPTIONS'] = 'YES'
+        config.build_settings['GCC_ENABLE_CPP_RTTI'] = 'YES'
+        
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+        config.build_settings['CLANG_WARN_DOCUMENTATION_COMMENTS'] = 'NO'
+        config.build_settings['CLANG_WARN_STRICT_PROTOTYPES'] = 'NO'
+        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        
+        # Enhanced C Flags
+        config.build_settings['OTHER_CFLAGS'] = [
+          '$(inherited)',
+          '-Wno-error',
+          '-Wno-error=non-modular-include-in-framework-module',
+          '-Wno-error=module-import-in-extern-c',
+          '-Wno-documentation',
+          '-w'
+        ]
+        
+        # Enhanced C++ Flags - CRITICAL
+        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = [
+          '$(inherited)',
+          '-std=c++20',
+          '-stdlib=libc++',
+          '-Wno-error',
+          '-Wno-unused-command-line-argument',
+          '-w'
+        ]
+        
+        # Linker flags
+        config.build_settings['OTHER_LDFLAGS'] = [
+          '$(inherited)',
+          '-lc++'
+        ]
+        
+        # Fix Swift module compilation
+        config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+        
+        # Enable DEFINES_MODULE for specific pods that need it
+        if ['GoogleUtilities', 'FirebaseCoreInternal', 'SwiftAudioEx', 'react-native-track-player'].include?(target.name)
+          config.build_settings['DEFINES_MODULE'] = 'YES'
+          if target.name == 'SwiftAudioEx' || target.name == 'react-native-track-player'
+            config.build_settings['SWIFT_VERSION'] = '5.0'
+          end
+        end
+      end
+    end
+    
+    # Fix Firebase header search paths
+    installer.pods_project.targets.each do |target|
+      if target.name == 'Firebase'
+        target.build_configurations.each do |config|
+          config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/FirebaseCore/FirebaseCore/Sources"'
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore.framework/Headers"'
+        end
+      end
+    end
   end
 end

@@ -23,8 +23,6 @@ import { getFontFamily } from '../../utils';
 import {AppIcon} from '../../components/AppIcon';
 import { icons } from '../../Assets';
 
-
-
 const roleOptions = [
   { id: 'tenant', name: 'Tenant' },
   { id: 'landlord', name: 'Landlord' },
@@ -32,6 +30,8 @@ const roleOptions = [
 ];
 
 const Register = ({ navigation }) => {
+  const scrollRef = React.useRef(null);
+
   const [fields, setFields] = useState({
     email: '',
     password: '',
@@ -100,6 +100,25 @@ const Register = ({ navigation }) => {
     }
   };
 
+  // Handler for dropdown toggle with scroll
+  const handleRoleDropdownToggle = () => {
+    const newState = !showRoleDropdown;
+    setShowRoleDropdown(newState);
+    
+    // If opening dropdown, scroll to bottom after a short delay
+    if (newState) {
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  };
+
+  // Handler for selecting a role
+  const handleRoleSelect = (roleId) => {
+    setFields({ ...fields, role: roleId });
+    setShowRoleDropdown(false);
+  };
+
   return (
     <ImageBackground
       source={require('../../Assets/Image/dwellProperties/Maskgroup1.png')}
@@ -113,6 +132,7 @@ const Register = ({ navigation }) => {
         <StatusBar backgroundColor={Colors.white} barStyle="dark-content" />
 
         <ScrollView
+          ref={scrollRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -123,15 +143,15 @@ const Register = ({ navigation }) => {
               onPress={() => navigation.goBack()}
               activeOpacity={0.7}
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
-<AppIcon name={icons.arrowBack} size={24} />
-       </TouchableOpacity>
+              <AppIcon name={icons.arrowBack} size={24} />
+            </TouchableOpacity>
             <Text style={styles.headerTitle}>Register</Text>
           </View>
 
           {/* Main Content */}
           <View style={styles.contentContainer}>
             <Text style={styles.mainHeading}>
-              Don’t have an{'\n'}
+              Don't have an{'\n'}
               <Text style={styles.boldText}>Account? Register Now!</Text>
             </Text>
 
@@ -194,7 +214,13 @@ const Register = ({ navigation }) => {
                 theme={{ roundness: 8 }}
                 right={
                   <TextInput.Icon
-                    icon={hidePassword ? 'eye' : 'eye-off'}
+                    icon={() => (
+                      <AppIcon
+                        name={hidePassword ? icons.eye : icons.eyeSlash}
+                        height={hp(2.3)}
+                        width={hp(2.3)}
+                      />
+                    )}
                     onPress={() => setHidePassword(!hidePassword)}
                     forceTextInputFocus={false}
                   />
@@ -225,7 +251,7 @@ const Register = ({ navigation }) => {
                   { marginTop: hp(1.5) },
                   errors.role && styles.roleInputError,
                 ]}
-                onPress={() => setShowRoleDropdown(!showRoleDropdown)}>
+                onPress={handleRoleDropdownToggle}>
                 <Text
                   style={[
                     styles.roleText,
@@ -235,11 +261,7 @@ const Register = ({ navigation }) => {
                     ? roleOptions.find(r => r.id === fields.role)?.name
                     : 'Select Role'}
                 </Text>
-                <Icon
-                  name={showRoleDropdown ? 'expand-less' : 'expand-more'}
-                  size={24}
-                  color="#555"
-                />
+                <AppIcon name={icons.arrowDown} />
               </TouchableOpacity>
               {errors.role && <Text style={styles.error}>{errors.role}</Text>}
 
@@ -253,10 +275,7 @@ const Register = ({ navigation }) => {
                         index === roleOptions.length - 1 &&
                           styles.lastDropdownItem,
                       ]}
-                      onPress={() => {
-                        setFields(f => ({ ...f, role: role.id }));
-                        setShowRoleDropdown(false);
-                      }}>
+                      onPress={() => handleRoleSelect(role.id)}>
                       <Text style={styles.dropdownItemText}>{role.name}</Text>
                     </TouchableOpacity>
                   ))}
@@ -299,12 +318,10 @@ const styles = StyleSheet.create({
   },
   imageStyle: {
     width: '100%',
-     height: 931,
+    height: 931,
     top: -400,
     left: 0,
-    //  height: hp(50),
     opacity: 0.3,
-    // resizeMode: 'cover',
   },
   gradientOverlay: {
     flex: 1,
@@ -314,6 +331,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: hp(5), // Added extra padding at bottom
   },
   header: {
     flexDirection: 'row',
@@ -335,7 +353,7 @@ const styles = StyleSheet.create({
   },
   mainHeading: {
     fontSize: hp(2.8),
-      fontWeight: 'bold',
+    fontWeight: 'bold',
     color: Colors.black,
     lineHeight: hp(3),
     marginBottom: hp(2),
@@ -431,6 +449,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: hp(1),
+    marginBottom: hp(2), // Added margin bottom
   },
   bottomText: {
     fontSize: hp(1.8),
